@@ -30,17 +30,6 @@
     background-position: center;
     background-repeat: no-repeat;
   }
-  /* Portrait viewports (phones, and tablets held upright) get a background
-     shot composed for a tall frame — color washes top and bottom, clear in
-     the middle — instead of the landscape image's center getting cropped
-     down to a narrow sliver. Landscape/wide desktop windows keep the
-     original above. */
-  @media (orientation: portrait) {
-    body {
-      background-image: url('./assets/Background-mobile.jpg'),
-        linear-gradient(135deg, #bfe8d9, #d9c9ec, #fbdcc9, #b9dcef, #f6f0c4);
-    }
-  }
   #game-container {
     /* Centering is Phaser's job (Scale.CENTER_BOTH sets the canvas's own
        margins) — flex/grid centering here would fight that and push the
