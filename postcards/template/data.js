@@ -24,6 +24,14 @@ export const assets = {
 // the envelope and below the paper once the ~250px reserved for the nav
 // buttons/dots near the bottom of the canvas is accounted for.
 export const layout = {
+  // envelope.width is the FULL source image's display width, including the
+  // transparent padding baked around the art — the actual visible envelope
+  // shape is only ~58% of that (its opaque bounding box within
+  // envelope-*-cutout.png's 1408x768 canvas). Past width ~1300, the visible
+  // shape exceeds the 750px design canvas and starts clipping at the left/
+  // right edges — invisible on a wide window (blends into the matching
+  // backdrop color) but very visible on a narrow one (clips flush against
+  // the screen edge, with zero letterbox margin to hide it in).
   envelope: { x: 375, y: 575, width: 867 },
   hotspot: { x: 408, y: 516, width: 263, height: 139 },
   paper: { width: 520, restX: 375, restY: 575 },
