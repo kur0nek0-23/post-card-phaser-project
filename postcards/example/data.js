@@ -24,9 +24,9 @@ export const assets = {
 // the envelope and below the paper once the ~250px reserved for the nav
 // buttons/dots near the bottom of the canvas is accounted for.
 export const layout = {
-  envelope: { x: 375, y: 575, width: 867 },
+  envelope: { x: 375, y: 575, width: 1500 },
   hotspot: { x: 408, y: 516, width: 263, height: 139 },
-  paper: { width: 520, restX: 375, restY: 575 },
+  paper: { width: 800, restX: 375, restY: 575 },
   // `finale` positions candle flames for the "finale" page type below.
   // `candles` are wick-tip positions measured from birthday-card.png,
   // as offsets from the card's own center (it renders at the same
