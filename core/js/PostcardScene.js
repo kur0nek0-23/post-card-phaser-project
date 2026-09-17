@@ -29,6 +29,7 @@ export class PostcardScene extends Phaser.Scene {
     this.buildEnvelope();
     this.buildHotspot();
     this.buildLetter();
+    this.buildFinale();
     this.buildNavZones();
     this.buildNavButtons();
     this.buildProgressDots();
@@ -174,8 +175,8 @@ export class PostcardScene extends Phaser.Scene {
 
     this.letterContainer = this.add.container(0, 0).setDepth(10).setVisible(false);
 
-    const paperImage = this.add.image(0, 0, 'paper').setScale(scale);
-    this.letterContainer.add(paperImage);
+    this.paperImage = this.add.image(0, 0, 'paper').setScale(scale);
+    this.letterContainer.add(this.paperImage);
 
     // Text is inset well inside the paper's opaque printed area so it
     // never spills past the paper's edges, on both the shortest and
@@ -212,6 +213,16 @@ export class PostcardScene extends Phaser.Scene {
 
   renderPage(index) {
     const page = this.pages[index];
+    const isFinale = page.type === 'finale';
+
+    this.paperImage.setVisible(!isFinale);
+    this.titleText.setVisible(!isFinale);
+    this.bodyText.setVisible(!isFinale);
+    if (this.finaleImage) this.finaleImage.setVisible(isFinale);
+    this.flames.forEach((flame) => flame.setVisible(isFinale));
+
+    if (isFinale) return; // finale card is fully baked art — no text to lay out
+
     const { textAreaWidth, textTop, textBottom } = this._textLayout;
 
     this.titleText.setText(page.title);
@@ -222,6 +233,83 @@ export class PostcardScene extends Phaser.Scene {
     this.bodyText.setY(bodyTop);
     const bodyMaxHeight = textBottom - bodyTop;
     fitTextToBox(this.bodyText, textAreaWidth, bodyMaxHeight, 26, 16);
+  }
+
+  // ---- finale (cake + flickering candles) ----------------------------------
+
+  // Measured from flame-cutout.png's own opaque bounding box (a 1408x768
+  // canvas): the flame sits with its base — where it should touch a candle
+  // wick — at roughly the horizontal center, 85% of the way down the image.
+  // Anchoring the flame's origin there (rather than the image center) means
+  // it can be scaled for size without also having to recompute its position.
+  static FLAME_ORIGIN_X = 0.4993;
+  static FLAME_ORIGIN_Y = 0.8477;
+  static FLAME_NATIVE_OPAQUE_HEIGHT = 520;
+
+  buildFinale() {
+    const finale = this.layout.finale;
+    this.flames = [];
+
+    if (!finale || !this.textures.exists('finaleCard')) {
+      this.finaleImage = null;
+      return;
+    }
+
+    // Shares the paper's stage scale/position, per the "same containment
+    // rules as the other paper pages" — both source images are the same
+    // 848x1264 canvas convention, so this lines up automatically.
+    const { width } = this.layout.paper;
+    const cardTexture = this.textures.get('finaleCard').getSourceImage();
+    const scale = width / cardTexture.width;
+
+    this.finaleImage = this.add.image(0, 0, 'finaleCard').setScale(scale).setVisible(false);
+    this.letterContainer.add(this.finaleImage);
+
+    if (!this.textures.exists('flame')) return;
+
+    const flameScale = (finale.flameHeight || 40) / PostcardScene.FLAME_NATIVE_OPAQUE_HEIGHT;
+
+    this.flames = (finale.candles || []).map((candle) => {
+      const flame = this.add
+        .image(candle.x, candle.y, 'flame')
+        .setOrigin(PostcardScene.FLAME_ORIGIN_X, PostcardScene.FLAME_ORIGIN_Y)
+        .setScale(flameScale)
+        .setVisible(false);
+      this.letterContainer.add(flame);
+      this.startFlameFlicker(flame, candle.x, candle.y, flameScale);
+      return flame;
+    });
+  }
+
+  // Stop-motion style flicker: a handful of hand-posed variations, snapped
+  // between on a low-frequency timer with no easing — a hard cut every
+  // tick, not a smooth tween. Each flame picks randomly from its own pose
+  // set and runs on its own independently-randomized interval/phase, so
+  // multiple candles never step in visible unison.
+  startFlameFlicker(flame, baseX, baseY, baseScale) {
+    const poses = [
+      { sx: 1.00, sy: 1.00, rot: 0, dx: 0, dy: 0 },
+      { sx: 1.10, sy: 0.92, rot: -6, dx: -1, dy: -1 },
+      { sx: 0.90, sy: 1.08, rot: 5, dx: 1, dy: 0 },
+      { sx: 1.05, sy: 0.96, rot: 7, dx: 0, dy: -2 },
+      { sx: 0.95, sy: 1.04, rot: -7, dx: -1, dy: 1 },
+      { sx: 1.03, sy: 1.02, rot: 3, dx: 1, dy: -1 },
+    ];
+
+    const applyRandomPose = () => {
+      const pose = Phaser.Utils.Array.GetRandom(poses);
+      flame.setScale(baseScale * pose.sx, baseScale * pose.sy);
+      flame.setAngle(pose.rot);
+      flame.setPosition(baseX + pose.dx, baseY + pose.dy);
+    };
+
+    const interval = Phaser.Math.Between(90, 140);
+    const startDelay = Phaser.Math.Between(0, interval);
+
+    applyRandomPose();
+    this.time.delayedCall(startDelay, () => {
+      this.time.addEvent({ delay: interval, loop: true, callback: applyRandomPose });
+    });
   }
 
   goToPage(delta) {
@@ -338,13 +426,14 @@ export class PostcardScene extends Phaser.Scene {
   }
 
   // ---------------------------------------------------------------------
-  // FINALE HAND-OFF (stub): once real "paper-photo" and "finale" page types
-  // exist (see the schema comment in data.js), the last page reaching a
-  // "finale" entry is where the cake + "Happy Birthday" lettering card and
-  // the blow-out-the-candle interaction get wired in. That interaction will
+  // BLOW-OUT-THE-CANDLES HAND-OFF (stub): the finale page itself (cake
+  // card + flickering candle flames, buildFinale() above) is implemented.
+  // Still not implemented: the mic-based "blow out the candles"
+  // interaction that would extinguish the flames on this page. That will
   // need getUserMedia + AnalyserNode volume detection, and per browser
   // autoplay/permission rules the mic prompt MUST be triggered from a
-  // direct user tap (e.g. a "light the candle" button), never on scene load.
-  // Not implemented here — out of scope for this build.
+  // direct user tap (e.g. a "light the candle" button), never on scene
+  // load. The "paper-photo" page type remains unimplemented too (see the
+  // schema comment in data.js).
   // ---------------------------------------------------------------------
 }

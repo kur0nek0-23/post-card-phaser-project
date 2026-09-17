@@ -10,6 +10,8 @@ export const assets = {
   envelopeClosed: './assets/envelope-closed-cutout.png',
   envelopeOpen: './assets/envelope-open-cutout.png',
   paper: './assets/paper-stack-cutout.png',
+  finaleCard: './assets/birthday-card.png',
+  flame: './assets/flame-cutout.png',
 };
 
 // Layout: where things sit in the 750x1334 design-resolution canvas
@@ -25,21 +27,45 @@ export const layout = {
   envelope: { x: 375, y: 575, width: 867 },
   hotspot: { x: 408, y: 516, width: 263, height: 139 },
   paper: { width: 520, restX: 375, restY: 575 },
+  // `finale` positions candle flames for the "finale" page type below.
+  // `candles` are wick-tip positions measured from birthday-card.png, as
+  // offsets from the card's own center (it renders at the same
+  // position/scale as `paper` above, so these are local to that same
+  // space). `flameHeight` is the target on-screen height (design px) of
+  // each flame's opaque shape.
+  finale: {
+    flameHeight: 40,
+    candles: [
+      { x: -42, y: -18 },
+      { x: -12, y: -20 },
+      { x: 17, y: -20 },
+      { x: 44, y: -19 },
+    ],
+  },
 };
 
 // Data-driven page array. Every entry is { id, type, title, body }.
 //
-// Only "paper" is implemented by PostcardScene. Two more types are
+// "paper" and "finale" are implemented by PostcardScene. One more type is
 // reserved for later without changing this shape:
 //   - "paper-photo": a paper page with a polaroid photo composited on top,
 //     alongside title/body text.
-//   - "finale": the closing cake + lettering card and the mic-based
-//     blow-out-the-candle interaction.
+// "finale" renders the cake + "Happy Birthday" lettering card (finaleCard)
+// with flickering candle flames on top; title/body are unused for this
+// type since the card art is fully baked. The mic-based blow-out-the-
+// candle interaction is a separate future feature — see the stub comment
+// at the bottom of PostcardScene.js.
 export const pages = [
   {
     id: 1,
     type: 'paper',
     title: 'Your title here',
     body: 'Edit data.js to add your own pages, then swap the art in ./assets/.',
+  },
+  {
+    id: 2,
+    type: 'finale',
+    title: '',
+    body: '',
   },
 ];
