@@ -22,8 +22,8 @@ export const assets = {
 // the envelope and below the paper once the ~250px reserved for the nav
 // buttons/dots near the bottom of the canvas is accounted for.
 export const layout = {
-  envelope: { x: 375, y: 575, width: 560 },
-  hotspot: { x: 396, y: 537, width: 170, height: 90 },
+  envelope: { x: 375, y: 575, width: 650 },
+  hotspot: { x: 400, y: 530, width: 197, height: 105 },
   paper: { width: 520, restX: 375, restY: 575 },
 };
 
