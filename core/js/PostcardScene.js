@@ -41,8 +41,17 @@ export class PostcardScene extends Phaser.Scene {
   // ---- background -------------------------------------------------------
 
   buildBackground() {
-    if (!this.textures.exists('background')) return;
-    const bg = this.add.image(DESIGN_WIDTH / 2, DESIGN_HEIGHT / 2, 'background');
+    // Same orientation check the page's own CSS backdrop uses (see
+    // index.html), so the in-canvas background and the DOM margin around
+    // it always agree — otherwise, on a portrait/mobile viewport where the
+    // canvas fills most of the screen, this in-canvas image would visually
+    // "win" over the DOM one and the page would look like it's using the
+    // desktop background after all.
+    const isPortrait = window.matchMedia('(orientation: portrait)').matches;
+    const key = isPortrait && this.textures.exists('backgroundMobile') ? 'backgroundMobile' : 'background';
+    if (!this.textures.exists(key)) return;
+
+    const bg = this.add.image(DESIGN_WIDTH / 2, DESIGN_HEIGHT / 2, key);
     bg.setDepth(-10);
     // Cover-fit: scale up so the design canvas is fully covered, cropping
     // overflow rather than stretching/distorting.

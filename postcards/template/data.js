@@ -4,9 +4,14 @@
 
 // Asset manifest: logical key -> path relative to this file's folder.
 // BootScene loads exactly these keys. `background` is optional — omit or
-// leave falsy to skip it.
+// leave falsy to skip it. `backgroundMobile` is also optional: PostcardScene
+// picks it over `background` when the page is loaded in a portrait/mobile
+// viewport (matching the same orientation media query the page's own CSS
+// backdrop uses), since a background composed for a landscape frame tends
+// to look like a thin, cropped strip when covering a tall narrow canvas.
 export const assets = {
   background: './assets/Background.jpg',
+  backgroundMobile: './assets/Background-mobile.jpg',
   envelopeClosed: './assets/envelope-closed-cutout.png',
   envelopeOpen: './assets/envelope-open-cutout.png',
   paper: './assets/paper-stack-cutout.png',
