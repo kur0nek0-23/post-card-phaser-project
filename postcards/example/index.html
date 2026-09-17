@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<title>Happy Birthday!</title>
+<style>
+  html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100dvh;
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+  body {
+    /* Full-viewport backdrop, independent of the design-resolution canvas:
+       Scale.FIT keeps the portrait stage intact and letterboxes it on wide
+       windows, and this is what fills that letterboxed margin so it reads
+       as a postcard centered on a background rather than black bars. It
+       sits behind #game-container in normal DOM stacking (no z-index
+       needed) since neither #game-container nor the canvas paint their own
+       background. Reuses the same watercolor wash as the in-scene
+       background so the two read as one palette; the gradient is just a
+       fallback if the image is ever missing.
+    */
+    background-image: url('./assets/Background.jpg'),
+      linear-gradient(135deg, #bfe8d9, #d9c9ec, #fbdcc9, #b9dcef, #f6f0c4);
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+  }
+  #game-container {
+    /* Centering is Phaser's job (Scale.CENTER_BOTH sets the canvas's own
+       margins) — flex/grid centering here would fight that and push the
+       canvas off-center, since both would try to position the same
+       element. This just needs to give Phaser the full viewport to work
+       with. */
+    width: 100%;
+    height: 100dvh;
+    overflow: hidden;
+    touch-action: manipulation;
+  }
+  canvas {
+    touch-action: manipulation;
+  }
+</style>
+</head>
+<body>
+<div id="game-container"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
+<script type="module">
+  import { createGameConfig } from '../../core/config.js';
+  import { BootScene } from '../../core/js/BootScene.js';
+  import { PostcardScene } from '../../core/js/PostcardScene.js';
+  import { assets, layout, pages } from './data.js';
+
+  const config = createGameConfig([BootScene, PostcardScene]);
+  const game = new Phaser.Game(config);
+  game.registry.set('postcard', { assets, layout, pages });
+</script>
+</body>
+</html>
