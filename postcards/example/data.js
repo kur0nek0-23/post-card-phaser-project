@@ -43,12 +43,12 @@ export const layout = {
   // space). `flameHeight` is the target on-screen height (design px) of
   // each flame's opaque shape.
   finale: {
-    flameHeight: 40,
+    flameHeight: 62,
     candles: [
-      { x: -42, y: -18 },
-      { x: -12, y: -20 },
-      { x: 17, y: -20 },
-      { x: 44, y: -19 },
+      { x: -65, y: -27 },
+      { x: -19, y: -30 },
+      { x: 25, y: -30 },
+      { x: 67, y: -29 },
     ],
   },
 };
