@@ -29,7 +29,6 @@ export class PostcardScene extends Phaser.Scene {
     this.buildEnvelope();
     this.buildHotspot();
     this.buildLetter();
-    this.buildFinale();
     this.buildNavZones();
     this.buildNavButtons();
     this.buildProgressDots();
@@ -136,14 +135,15 @@ export class PostcardScene extends Phaser.Scene {
 
     const { restX, restY } = this.layout.paper;
     const hotspot = this.layout.hotspot;
+    const activeContainer = this.pageLayers[this.activeLayerIndex].container;
 
-    this.letterContainer.setPosition(hotspot.x, hotspot.y + 20);
-    this.letterContainer.setScale(0.35);
-    this.letterContainer.setAlpha(0.4);
-    this.letterContainer.setVisible(true);
+    activeContainer.setPosition(hotspot.x, hotspot.y + 20);
+    activeContainer.setScale(0.35);
+    activeContainer.setAlpha(0.4);
+    activeContainer.setVisible(true);
 
     this.tweens.add({
-      targets: this.letterContainer,
+      targets: activeContainer,
       x: restX,
       y: restY,
       scale: 1,
@@ -161,22 +161,32 @@ export class PostcardScene extends Phaser.Scene {
     this.prevButton.setInteractive().setVisible(true);
     this.nextButton.setInteractive().setVisible(true);
     this.dots.forEach((dot) => dot.setVisible(true));
-    this.renderPage(this.currentIndex);
+    this.renderPageLayer(this.pageLayers[this.activeLayerIndex], this.currentIndex);
     this.updateProgressDots();
   }
 
   // ---- letter / paper -----------------------------------------------------
 
+  // Two independent, fully-populated visual layers rather than one shared
+  // set of objects. A true crossfade needs the outgoing page's finished
+  // content fading out while the incoming page's content fades in on top
+  // of it, at the same time — one shared layer can only empty out and then
+  // refill, which shows a gap in between rather than a cross-dissolve.
   buildLetter() {
+    this.pageLayers = [this.buildPageLayer(), this.buildPageLayer()];
+    this.activeLayerIndex = 0;
+  }
+
+  buildPageLayer() {
     const { width } = this.layout.paper;
     const paperTexture = this.textures.get('paper').getSourceImage();
     const scale = width / paperTexture.width;
     const displayHeight = paperTexture.height * scale;
 
-    this.letterContainer = this.add.container(0, 0).setDepth(10).setVisible(false);
+    const container = this.add.container(0, 0).setDepth(10).setVisible(false);
 
-    this.paperImage = this.add.image(0, 0, 'paper').setScale(scale);
-    this.letterContainer.add(this.paperImage);
+    const paperImage = this.add.image(0, 0, 'paper').setScale(scale);
+    container.add(paperImage);
 
     // Text is inset well inside the paper's opaque printed area so it
     // never spills past the paper's edges, on both the shortest and
@@ -188,7 +198,7 @@ export class PostcardScene extends Phaser.Scene {
     const textTop = -displayHeight / 2 + insetTop;
     const textBottom = displayHeight / 2 - insetBottom;
 
-    this.titleText = this.add.text(0, textTop, '', {
+    const titleText = this.add.text(0, textTop, '', {
       fontFamily: 'Georgia, serif',
       fontSize: '34px',
       color: '#3a2f28',
@@ -197,7 +207,7 @@ export class PostcardScene extends Phaser.Scene {
       wordWrap: { width: textAreaWidth },
     }).setOrigin(0.5, 0);
 
-    this.bodyText = this.add.text(0, 0, '', {
+    const bodyText = this.add.text(0, 0, '', {
       fontFamily: 'Georgia, serif',
       fontSize: '24px',
       color: '#3a2f28',
@@ -205,34 +215,44 @@ export class PostcardScene extends Phaser.Scene {
       wordWrap: { width: textAreaWidth },
     }).setOrigin(0.5, 0);
 
-    this.letterContainer.add(this.titleText);
-    this.letterContainer.add(this.bodyText);
+    container.add(titleText);
+    container.add(bodyText);
 
-    this._textLayout = { textAreaWidth, textTop, textBottom };
+    const { finaleImage, flames } = this.buildFinaleVisuals(container, width);
+
+    return {
+      container,
+      paperImage,
+      titleText,
+      bodyText,
+      finaleImage,
+      flames,
+      textLayout: { textAreaWidth, textTop, textBottom },
+    };
   }
 
-  renderPage(index) {
+  renderPageLayer(layer, index) {
     const page = this.pages[index];
     const isFinale = page.type === 'finale';
 
-    this.paperImage.setVisible(!isFinale);
-    this.titleText.setVisible(!isFinale);
-    this.bodyText.setVisible(!isFinale);
-    if (this.finaleImage) this.finaleImage.setVisible(isFinale);
-    this.flames.forEach((flame) => flame.setVisible(isFinale));
+    layer.paperImage.setVisible(!isFinale);
+    layer.titleText.setVisible(!isFinale);
+    layer.bodyText.setVisible(!isFinale);
+    if (layer.finaleImage) layer.finaleImage.setVisible(isFinale);
+    layer.flames.forEach((flame) => flame.setVisible(isFinale));
 
     if (isFinale) return; // finale card is fully baked art — no text to lay out
 
-    const { textAreaWidth, textTop, textBottom } = this._textLayout;
+    const { textAreaWidth, textTop, textBottom } = layer.textLayout;
 
-    this.titleText.setText(page.title);
-    this.titleText.setY(textTop);
+    layer.titleText.setText(page.title);
+    layer.titleText.setY(textTop);
 
-    this.bodyText.setText(page.body);
-    const bodyTop = textTop + this.titleText.height + 24;
-    this.bodyText.setY(bodyTop);
+    layer.bodyText.setText(page.body);
+    const bodyTop = textTop + layer.titleText.height + 24;
+    layer.bodyText.setY(bodyTop);
     const bodyMaxHeight = textBottom - bodyTop;
-    fitTextToBox(this.bodyText, textAreaWidth, bodyMaxHeight, 26, 16);
+    fitTextToBox(layer.bodyText, textAreaWidth, bodyMaxHeight, 26, 16);
   }
 
   // ---- finale (cake + flickering candles) ----------------------------------
@@ -246,39 +266,42 @@ export class PostcardScene extends Phaser.Scene {
   static FLAME_ORIGIN_Y = 0.8477;
   static FLAME_NATIVE_OPAQUE_HEIGHT = 520;
 
-  buildFinale() {
+  // Builds one layer's finale (cake card + candle flames) visuals into the
+  // given container, so each of the two crossfading layers gets its own
+  // fully independent copy — including its own flame flicker timers.
+  buildFinaleVisuals(container, paperWidth) {
     const finale = this.layout.finale;
-    this.flames = [];
-
     if (!finale || !this.textures.exists('finaleCard')) {
-      this.finaleImage = null;
-      return;
+      return { finaleImage: null, flames: [] };
     }
 
     // Shares the paper's stage scale/position, per the "same containment
     // rules as the other paper pages" — both source images are the same
     // 848x1264 canvas convention, so this lines up automatically.
-    const { width } = this.layout.paper;
     const cardTexture = this.textures.get('finaleCard').getSourceImage();
-    const scale = width / cardTexture.width;
+    const scale = paperWidth / cardTexture.width;
 
-    this.finaleImage = this.add.image(0, 0, 'finaleCard').setScale(scale).setVisible(false);
-    this.letterContainer.add(this.finaleImage);
+    const finaleImage = this.add.image(0, 0, 'finaleCard').setScale(scale).setVisible(false);
+    container.add(finaleImage);
 
-    if (!this.textures.exists('flame')) return;
+    if (!this.textures.exists('flame')) {
+      return { finaleImage, flames: [] };
+    }
 
     const flameScale = (finale.flameHeight || 40) / PostcardScene.FLAME_NATIVE_OPAQUE_HEIGHT;
 
-    this.flames = (finale.candles || []).map((candle) => {
+    const flames = (finale.candles || []).map((candle) => {
       const flame = this.add
         .image(candle.x, candle.y, 'flame')
         .setOrigin(PostcardScene.FLAME_ORIGIN_X, PostcardScene.FLAME_ORIGIN_Y)
         .setScale(flameScale)
         .setVisible(false);
-      this.letterContainer.add(flame);
+      container.add(flame);
       this.startFlameFlicker(flame, candle.x, candle.y, flameScale);
       return flame;
     });
+
+    return { finaleImage, flames };
   }
 
   // Stop-motion style flicker: a handful of hand-posed variations, snapped
@@ -312,6 +335,9 @@ export class PostcardScene extends Phaser.Scene {
     });
   }
 
+  // Shared duration (ms) for both halves of the page crossfade below.
+  static PAGE_CROSSFADE_DURATION = 250;
+
   goToPage(delta) {
     if (this.state !== 'reading' || this.isTransitioning) return;
     const next = this.currentIndex + delta;
@@ -321,24 +347,36 @@ export class PostcardScene extends Phaser.Scene {
     this.currentIndex = next;
     this.updateProgressDots();
 
-    // The envelope layer underneath is never touched by this transition —
-    // only the paper+text container crossfades.
+    const outgoing = this.pageLayers[this.activeLayerIndex];
+    const incomingIndex = 1 - this.activeLayerIndex;
+    const incoming = this.pageLayers[incomingIndex];
+
+    // A real crossfade: render the new page into the OTHER layer while
+    // it's invisible, then fade both layers at once — outgoing 1->0 and
+    // incoming 0->1 in parallel — so the two dissolve into each other
+    // instead of fading to empty and back. The envelope layer underneath
+    // is never touched by this transition.
+    this.renderPageLayer(incoming, this.currentIndex);
+    const { restX, restY } = this.layout.paper;
+    incoming.container.setPosition(restX, restY).setScale(1).setAlpha(0).setVisible(true);
+
+    const duration = PostcardScene.PAGE_CROSSFADE_DURATION;
+
     this.tweens.add({
-      targets: this.letterContainer,
+      targets: outgoing.container,
       alpha: 0,
-      duration: 160,
-      ease: 'Sine.easeIn',
+      duration,
+      ease: 'Sine.easeInOut',
+      onComplete: () => outgoing.container.setVisible(false),
+    });
+    this.tweens.add({
+      targets: incoming.container,
+      alpha: 1,
+      duration,
+      ease: 'Sine.easeInOut',
       onComplete: () => {
-        this.renderPage(this.currentIndex);
-        this.tweens.add({
-          targets: this.letterContainer,
-          alpha: 1,
-          duration: 160,
-          ease: 'Sine.easeOut',
-          onComplete: () => {
-            this.isTransitioning = false;
-          },
-        });
+        this.activeLayerIndex = incomingIndex;
+        this.isTransitioning = false;
       },
     });
   }
@@ -427,7 +465,8 @@ export class PostcardScene extends Phaser.Scene {
 
   // ---------------------------------------------------------------------
   // BLOW-OUT-THE-CANDLES HAND-OFF (stub): the finale page itself (cake
-  // card + flickering candle flames, buildFinale() above) is implemented.
+  // card + flickering candle flames, buildFinaleVisuals() above) is
+  // implemented.
   // Still not implemented: the mic-based "blow out the candles"
   // interaction that would extinguish the flames on this page. That will
   // need getUserMedia + AnalyserNode volume detection, and per browser
