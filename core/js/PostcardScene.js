@@ -675,14 +675,24 @@ export class PostcardScene extends Phaser.Scene {
     layer.flames.forEach((flame) => this.extinguishFlame(flame, layer.container));
   }
 
-  // The "blown out by wind" animation: a single smooth tilt-and-fade —
-  // no stretching the flame's shape, just leaning to one side while it
-  // shrinks slightly and fades out. A real eased tween, unlike the idle/
-  // blowing flicker's deliberate hard cuts, since this is a one-shot beat
-  // rather than a repeating stop-motion loop. Finishes hidden and reset
-  // back to its resting pose (so a future re-light via
+  // The "blown out by wind" animation: a handful of discrete frames —
+  // tilting, shrinking, and fading further at each step — hard-cut at a
+  // low frame rate, same stop-motion aesthetic as the idle/blowing
+  // flicker rather than a smoothly eased tween. No stretching the
+  // flame's shape (scaleX/scaleY always move together). Finishes hidden
+  // and reset back to its resting pose (so a future re-light via
   // resetBlowInteraction has a clean starting point), plus a small soft
   // puff at the wick.
+  static EXTINGUISH_FRAME_DELAY_MS = 70;
+  static EXTINGUISH_FRAMES = [
+    { scale: 0.85, rot: 12, dx: 2, alpha: 0.85 },
+    { scale: 0.65, rot: 22, dx: 4, alpha: 0.65 },
+    { scale: 0.48, rot: 30, dx: 6, alpha: 0.45 },
+    { scale: 0.30, rot: 37, dx: 8, alpha: 0.25 },
+    { scale: 0.15, rot: 42, dx: 9, alpha: 0.08 },
+    { scale: 0.02, rot: 45, dx: 10, alpha: 0 },
+  ];
+
   extinguishFlame(flame, container) {
     const flickerEvent = flame.getData('flickerEvent');
     if (flickerEvent) flickerEvent.remove();
@@ -692,23 +702,28 @@ export class PostcardScene extends Phaser.Scene {
     const baseScaleX = flame.getData('baseScaleX');
     const baseScaleY = flame.getData('baseScaleY');
     const leanDir = Math.random() < 0.5 ? -1 : 1;
+    const frames = PostcardScene.EXTINGUISH_FRAMES;
 
-    this.tweens.add({
-      targets: flame,
-      angle: leanDir * 40,
-      x: baseX + leanDir * 10,
-      scaleX: baseScaleX * 0.75,
-      scaleY: baseScaleY * 0.75,
-      alpha: 0,
-      duration: 320,
-      ease: 'Sine.easeIn',
-      onComplete: () => {
-        flame
-          .setVisible(false)
-          .setAlpha(1)
-          .setScale(baseScaleX, baseScaleY)
-          .setAngle(0)
-          .setPosition(baseX, baseY);
+    let frameIndex = 0;
+    this.time.addEvent({
+      delay: PostcardScene.EXTINGUISH_FRAME_DELAY_MS,
+      repeat: frames.length - 1,
+      callback: () => {
+        const f = frames[frameIndex];
+        flame.setScale(baseScaleX * f.scale, baseScaleY * f.scale);
+        flame.setAngle(leanDir * f.rot);
+        flame.setAlpha(f.alpha);
+        flame.setPosition(baseX + leanDir * f.dx, baseY);
+
+        frameIndex += 1;
+        if (frameIndex === frames.length) {
+          flame
+            .setVisible(false)
+            .setAlpha(1)
+            .setScale(baseScaleX, baseScaleY)
+            .setAngle(0)
+            .setPosition(baseX, baseY);
+        }
       },
     });
 
