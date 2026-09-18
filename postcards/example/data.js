@@ -59,7 +59,18 @@ export const layout = {
   // than sit inside its frame. `width` is the polaroid's own full-canvas
   // display width (same convention as `paper.width`/`envelope.width`), and
   // `rotation` is in degrees.
-  paperPhoto: { width: 280, x: 270, y: 380, rotation: 8 },
+  //
+  // Same clipping trap as envelope.width above, just easier to hit by
+  // accident here since this sits near a corner: push `x`/`width` too far
+  // and the ROTATED image's bounding box (bigger than the unrotated one —
+  // a tilted rectangle's corners sweep out further) crosses the 750px
+  // design canvas edge and gets clipped, same as any other canvas content.
+  // At width: 280, x: 180 the image's own bounds (Phaser's getBounds(),
+  // checked directly rather than estimated) sit ~27px inside the edge; x:
+  // 270 overflowed it by ~63px. If you push this further out, verify
+  // against getBounds() rather than eyeballing it — rotation makes the
+  // safe range harder to guess than the envelope's was.
+  paperPhoto: { width: 280, x: 180, y: 380, rotation: 8 },
 };
 
 // Data-driven page array. Every entry is { id, type, title, body }.
