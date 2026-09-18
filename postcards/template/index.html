@@ -44,9 +44,43 @@
   canvas {
     touch-action: manipulation;
   }
+  /* Pinned to the actual browser window's corners, deliberately OUTSIDE
+     Phaser's scene — the design-resolution canvas gets scaled/letterboxed
+     by Scale.FIT to fit the real viewport, which is right for the
+     postcard content but wrong for these: they need to track the
+     physical corners of the window itself regardless of how the canvas
+     inside is scaled, staying put through a resize rather than scaling
+     with the letterboxed content. `position: fixed` + a viewport-relative
+     clamp() (not a fixed px size) does that. Sits above the canvas
+     (higher z-index than the unpositioned #game-container/canvas, which
+     default to the bottom of the stack) so it reads as a frame over
+     everything, including on narrow phones with no letterbox margin —
+     pointer-events: none so it never intercepts taps meant for the
+     envelope/paper/buttons underneath, and the art itself fades to
+     transparent toward the center so it shouldn't visually cover them
+     either (checked at narrow/medium/wide widths).
+  */
+  .corner-floral {
+    position: fixed;
+    width: clamp(110px, 20vw, 260px);
+    height: auto;
+    pointer-events: none;
+    user-select: none;
+    z-index: 5;
+  }
+  .corner-floral--top-left {
+    top: 0;
+    left: 0;
+  }
+  .corner-floral--bottom-right {
+    bottom: 0;
+    right: 0;
+  }
 </style>
 </head>
 <body>
+<img class="corner-floral corner-floral--top-left" src="./assets/corner-floral-topleft-cutout.png" alt="" draggable="false" />
+<img class="corner-floral corner-floral--bottom-right" src="./assets/corner-floral-bottomright-cutout.png" alt="" draggable="false" />
 <div id="game-container"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
