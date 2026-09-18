@@ -1,5 +1,6 @@
 import { DESIGN_WIDTH, DESIGN_HEIGHT } from '../config.js';
 import * as audio from './audio.js';
+import { startMicVolumeMeter } from './candleMic.js';
 
 // Fit a Phaser Text object's font size into a box by shrinking it (never
 // growing past maxSize) until its wrapped height fits, or minSize is hit.
@@ -218,13 +219,28 @@ export class PostcardScene extends Phaser.Scene {
     container.add(titleText);
     container.add(bodyText);
 
-    const { finaleImage, flames } = this.buildFinaleVisuals(container, width);
-    // Added last so it draws on top of the paper and its text regardless
-    // of body length — it's an overlay sitting above the page, not
-    // content composited inside the paper's own printed area.
+    // Shared mutable state the flame flicker ticks read from (created
+    // now, before buildFinaleVisuals/startFlameFlicker need it) and the
+    // blow-interaction handlers below write to — same object either way,
+    // so a flicker tick sees an update the instant a volume reading
+    // changes it, with no extra wiring.
+    const blow = { state: 'idle', progress: 0, isBlowingNow: false, micSession: null, tickEvent: null };
+    const flameFlickerEvents = [];
+
+    const { finaleImage, flames } = this.buildFinaleVisuals(container, width, blow, flameFlickerEvents);
+    // Added after the finale visuals so it draws on top of them, and
+    // before the polaroid so the polaroid (unrelated to the finale page)
+    // stays on top of everything as before.
+    // `layerRef` is a forward reference: the blow button's tap handler
+    // needs the full, finished layer object (to reach the progress bar,
+    // status text, flame array, etc.), but that object doesn't exist
+    // until this method returns — `layerRef.current` gets set at the very
+    // end, and the handler (called later, on an actual tap) reads it then.
+    const layerRef = {};
+    const blowUI = this.buildBlowInteraction(container, layerRef, width);
     const polaroidImage = this.buildPolaroidOverlay(container);
 
-    return {
+    const layer = {
       container,
       paperImage,
       titleText,
@@ -233,7 +249,119 @@ export class PostcardScene extends Phaser.Scene {
       flames,
       polaroidImage,
       textLayout: { textAreaWidth, textTop, textBottom },
+      blow,
+      flameFlickerEvents,
+      candlesExtinguished: false,
+      ...blowUI,
     };
+    layerRef.current = layer;
+    return layer;
+  }
+
+  // Layout for the "blow out the candles" UI. Positioned BELOW the whole
+  // cake rather than above the candles: the flames' actual rendered
+  // bounds (checked directly via getBounds(), not estimated) reach up
+  // over 100px above their wick-tip anchor, which left no real room for
+  // a 60px-tall button between the title and the candles. Expressed as
+  // offsets (in birthday-card.png's own native pixels) below the card's
+  // measured opaque bottom edge, then scaled by the SAME paperWidth/848
+  // factor as the card image and candle flames — not fixed local
+  // constants — since those are per-site values (layout.finale.candles
+  // is measured per-site too) and this has to track whatever the current
+  // site's card scale actually is, not just the specific size this was
+  // measured against.
+  static FINALE_CARD_NATIVE_HALF_HEIGHT = 632; // 1264/2 — birthday-card.png's own canvas center
+  static FINALE_CARD_NATIVE_OPAQUE_BOTTOM = 1117; // measured via its alpha channel
+  static BLOW_WISH_TEXT_NATIVE_OFFSET = 24;
+  static BLOW_STATUS_TEXT_NATIVE_OFFSET = 66;
+  static BLOW_CONTROL_NATIVE_OFFSET = 119;
+  static BLOW_BUTTON_WIDTH = 220;
+  static BLOW_BUTTON_HEIGHT = 60;
+  static BLOW_BAR_WIDTH = 220;
+  static BLOW_BAR_HEIGHT = 22;
+
+  // Builds the "make a wish" text, the tap-to-blow button, the error/
+  // retry status text, and the progress bar for one page layer's finale
+  // page — all nested inside the same container as the rest of that
+  // layer's finale visuals, so they crossfade with everything else and
+  // never need separate position bookkeeping. `layerRef` is the forward
+  // reference described in buildPageLayer — the button's tap handler
+  // reads `layerRef.current` when it actually fires, not now. `paperWidth`
+  // is layout.paper.width, needed to scale the Y positions (see above)
+  // and the text wrap widths to the current site's card size.
+  buildBlowInteraction(container, layerRef, paperWidth) {
+    const scale = paperWidth / 848; // same convention as buildFinaleVisuals/candles
+    const cardBottomLocal = (PostcardScene.FINALE_CARD_NATIVE_OPAQUE_BOTTOM - PostcardScene.FINALE_CARD_NATIVE_HALF_HEIGHT) * scale;
+    const wishTextY = cardBottomLocal + PostcardScene.BLOW_WISH_TEXT_NATIVE_OFFSET * scale;
+    const statusTextY = cardBottomLocal + PostcardScene.BLOW_STATUS_TEXT_NATIVE_OFFSET * scale;
+    const controlY = cardBottomLocal + PostcardScene.BLOW_CONTROL_NATIVE_OFFSET * scale;
+    // Text wrap widths scale with the card too (70% of paperWidth, safely
+    // inside the card's ~79%-wide opaque area) — a fixed pixel width
+    // would spill past the edges of a much smaller card.
+    const textWrapWidth = paperWidth * 0.7;
+
+    const wishText = this.add
+      .text(0, wishTextY, 'Make a wish, blow the candle', {
+        fontFamily: 'Georgia, serif',
+        fontSize: '24px',
+        color: '#3a2f28',
+        align: 'center',
+        wordWrap: { width: textWrapWidth },
+      })
+      .setOrigin(0.5)
+      .setVisible(false);
+    container.add(wishText);
+
+    const statusText = this.add
+      .text(0, statusTextY, '', {
+        fontFamily: 'Georgia, serif',
+        fontSize: '16px',
+        color: '#7a4a3a',
+        align: 'center',
+        wordWrap: { width: textWrapWidth },
+      })
+      .setOrigin(0.5)
+      .setVisible(false);
+    container.add(statusText);
+
+    const btnW = PostcardScene.BLOW_BUTTON_WIDTH;
+    const btnH = PostcardScene.BLOW_BUTTON_HEIGHT;
+    const blowButton = this.add.container(0, controlY);
+    const btnBg = this.add.rectangle(0, 0, btnW, btnH, 0x000000, 0.35).setStrokeStyle(1, 0xffffff, 0.6);
+    const blowButtonText = this.add
+      .text(0, 0, 'Tap to blow', { fontFamily: 'Georgia, serif', fontSize: '22px', color: '#ffffff' })
+      .setOrigin(0.5);
+    blowButton.add([btnBg, blowButtonText]);
+    // Same one-shot setInteractive() pattern used by makeNavButton: full
+    // hit-area/cursor config given once here, then only ever toggled via
+    // disableInteractive() / bare setInteractive() afterward.
+    blowButton.setInteractive({
+      hitArea: new Phaser.Geom.Rectangle(-btnW / 2, -btnH / 2, btnW, btnH),
+      hitAreaCallback: Phaser.Geom.Rectangle.Contains,
+      useHandCursor: true,
+    });
+    blowButton.disableInteractive();
+    blowButton.setVisible(false);
+    blowButton.on('pointerdown', () => this.handleBlowButtonTap(layerRef.current));
+    container.add(blowButton);
+
+    const barW = PostcardScene.BLOW_BAR_WIDTH;
+    const barH = PostcardScene.BLOW_BAR_HEIGHT;
+    const progressBarBg = this.add
+      .rectangle(0, controlY, barW, barH, 0x000000, 0.2)
+      .setStrokeStyle(1, 0xffffff, 0.5)
+      .setVisible(false);
+    // Origin (0, 0.5): anchored at its own left-center, positioned at the
+    // bar's left edge, so growing `.width` extends it rightward — a
+    // standard progress-fill setup.
+    const progressBarFill = this.add
+      .rectangle(-barW / 2, controlY, 1, barH - 4, 0xf2c14e, 0.9)
+      .setOrigin(0, 0.5)
+      .setVisible(false);
+    container.add(progressBarBg);
+    container.add(progressBarFill);
+
+    return { wishText, statusText, blowButton, blowButtonText, progressBarBg, progressBarFill };
   }
 
   // `paperPhoto` positions the polaroid for the "paper-photo" page type —
@@ -264,8 +392,25 @@ export class PostcardScene extends Phaser.Scene {
     layer.titleText.setVisible(!isFinale);
     layer.bodyText.setVisible(!isFinale);
     if (layer.finaleImage) layer.finaleImage.setVisible(isFinale);
-    layer.flames.forEach((flame) => flame.setVisible(isFinale));
     if (layer.polaroidImage) layer.polaroidImage.setVisible(showPolaroid);
+
+    if (isFinale) {
+      // Fresh visit (or a re-visit after a previous blow-out) — reset the
+      // whole blow interaction and re-light any extinguished flames.
+      this.resetBlowInteraction(layer);
+    } else {
+      // Leaving the finale page (or it was never on it): make sure
+      // nothing lingers — most importantly, release the mic if a session
+      // was active, rather than leaving it listening in the background.
+      this.stopListening(layer);
+      layer.wishText.setVisible(false);
+      layer.statusText.setVisible(false);
+      layer.blowButton.setVisible(false).disableInteractive();
+      layer.progressBarBg.setVisible(false);
+      layer.progressBarFill.setVisible(false);
+    }
+
+    layer.flames.forEach((flame) => flame.setVisible(isFinale && !layer.candlesExtinguished));
 
     if (isFinale) return; // finale card is fully baked art — no text to lay out
 
@@ -292,10 +437,37 @@ export class PostcardScene extends Phaser.Scene {
   static FLAME_ORIGIN_Y = 0.8477;
   static FLAME_NATIVE_OPAQUE_HEIGHT = 520;
 
+  // Poses for the idle flicker: subtle, hand-posed variations.
+  static IDLE_FLAME_POSES = [
+    { sx: 1.00, sy: 1.00, rot: 0, dx: 0, dy: 0 },
+    { sx: 1.10, sy: 0.92, rot: -6, dx: -1, dy: -1 },
+    { sx: 0.90, sy: 1.08, rot: 5, dx: 1, dy: 0 },
+    { sx: 1.05, sy: 0.96, rot: 7, dx: 0, dy: -2 },
+    { sx: 0.95, sy: 1.04, rot: -7, dx: -1, dy: 1 },
+    { sx: 1.03, sy: 1.02, rot: 3, dx: 1, dy: -1 },
+  ];
+
+  // Poses used while the user is actively blowing on the candles — bigger
+  // deltas, all leaning/stretching the same general direction (positive
+  // rot/dx), so it reads as the flame being pushed by wind rather than
+  // idly flickering. Still a hard-cut pose swap, same as the idle set,
+  // just more dramatic and (see startFlameFlicker) ticked faster.
+  static BLOWING_FLAME_POSES = [
+    { sx: 0.80, sy: 1.30, rot: 20, dx: 7, dy: -4 },
+    { sx: 0.65, sy: 1.40, rot: 28, dx: 10, dy: -5 },
+    { sx: 0.90, sy: 1.15, rot: 14, dx: 5, dy: -3 },
+    { sx: 0.72, sy: 1.35, rot: 24, dx: 9, dy: -4 },
+  ];
+
   // Builds one layer's finale (cake card + candle flames) visuals into the
   // given container, so each of the two crossfading layers gets its own
   // fully independent copy — including its own flame flicker timers.
-  buildFinaleVisuals(container, paperWidth) {
+  // `blow` is the layer's shared blow-interaction state (see
+  // buildPageLayer) — startFlameFlicker reads `blow.isBlowingNow` every
+  // tick to pick which pose set to use. `flameFlickerEvents` collects
+  // each flame's TimerEvent so resetBlowInteraction/extinguishFlame can
+  // stop them later.
+  buildFinaleVisuals(container, paperWidth, blow, flameFlickerEvents) {
     const finale = this.layout.finale;
     if (!finale || !this.textures.exists('finaleCard')) {
       return { finaleImage: null, flames: [] };
@@ -322,8 +494,13 @@ export class PostcardScene extends Phaser.Scene {
         .setOrigin(PostcardScene.FLAME_ORIGIN_X, PostcardScene.FLAME_ORIGIN_Y)
         .setScale(flameScale)
         .setVisible(false);
+      // The extinguish animation and the idle-state reset both need to
+      // get back to "the resting pose" from wherever a flicker tick left
+      // the flame — stashed on the object itself since extinguishFlame()
+      // only receives the flame, not this whole closure's local scope.
+      flame.setData({ baseX: candle.x, baseY: candle.y, baseScaleX: flameScale, baseScaleY: flameScale });
       container.add(flame);
-      this.startFlameFlicker(flame, candle.x, candle.y, flameScale);
+      this.startFlameFlicker(flame, candle.x, candle.y, flameScale, blow, flameFlickerEvents);
       return flame;
     });
 
@@ -334,30 +511,233 @@ export class PostcardScene extends Phaser.Scene {
   // between on a low-frequency timer with no easing — a hard cut every
   // tick, not a smooth tween. Each flame picks randomly from its own pose
   // set and runs on its own independently-randomized interval/phase, so
-  // multiple candles never step in visible unison.
-  startFlameFlicker(flame, baseX, baseY, baseScale) {
-    const poses = [
-      { sx: 1.00, sy: 1.00, rot: 0, dx: 0, dy: 0 },
-      { sx: 1.10, sy: 0.92, rot: -6, dx: -1, dy: -1 },
-      { sx: 0.90, sy: 1.08, rot: 5, dx: 1, dy: 0 },
-      { sx: 1.05, sy: 0.96, rot: 7, dx: 0, dy: -2 },
-      { sx: 0.95, sy: 1.04, rot: -7, dx: -1, dy: 1 },
-      { sx: 1.03, sy: 1.02, rot: 3, dx: 1, dy: -1 },
-    ];
-
+  // multiple candles never step in visible unison. While `blow.isBlowingNow`
+  // is true, it swaps to the bigger BLOWING_FLAME_POSES set and a shorter
+  // (independently re-randomized) interval — still hard-cut, just more
+  // agitated — and eases back to the idle set/pace the moment it goes
+  // false again.
+  startFlameFlicker(flame, baseX, baseY, baseScale, blow, flameFlickerEvents) {
     const applyRandomPose = () => {
+      const poses = blow.isBlowingNow ? PostcardScene.BLOWING_FLAME_POSES : PostcardScene.IDLE_FLAME_POSES;
       const pose = Phaser.Utils.Array.GetRandom(poses);
       flame.setScale(baseScale * pose.sx, baseScale * pose.sy);
       flame.setAngle(pose.rot);
       flame.setPosition(baseX + pose.dx, baseY + pose.dy);
     };
 
-    const interval = Phaser.Math.Between(90, 140);
-    const startDelay = Phaser.Math.Between(0, interval);
+    const idleInterval = Phaser.Math.Between(90, 140);
+    const startDelay = Phaser.Math.Between(0, idleInterval);
 
     applyRandomPose();
     this.time.delayedCall(startDelay, () => {
-      this.time.addEvent({ delay: interval, loop: true, callback: applyRandomPose });
+      const event = this.time.addEvent({
+        delay: idleInterval,
+        loop: true,
+        callback: () => {
+          applyRandomPose();
+          // Re-randomized every tick (not just once) so the boosted pace
+          // doesn't lock every candle into the same rhythm the moment
+          // blowing starts.
+          event.delay = blow.isBlowingNow ? Phaser.Math.Between(40, 65) : Phaser.Math.Between(90, 140);
+        },
+      });
+      flame.setData('flickerEvent', event);
+      flameFlickerEvents.push(event);
+    });
+  }
+
+  // ---- blow-out-the-candles interaction --------------------------------
+
+  // Mic-volume tuning. BLOW_VOLUME_THRESHOLD is the normalized-RMS level
+  // (see candleMic.js's getVolume()) a real blow needs to cross — set
+  // comfortably above typical room-noise floor, but this is exactly the
+  // kind of number that benefits from checking against a real mic/room
+  // if it ever feels off (too twitchy on background noise, or requiring
+  // an unreasonably hard blow); nothing else in this method depends on
+  // getting it exactly right. FILL/DECAY are progress-per-second while
+  // above/below that threshold — at these rates a sustained blow fills
+  // the bar in ~1.4s, and stopping mid-blow drains it fast enough that a
+  // single short spike can't complete it by accident.
+  static BLOW_VOLUME_THRESHOLD = 0.13;
+  static BLOW_FILL_RATE = 0.7;
+  static BLOW_DECAY_RATE = 0.4;
+  static BLOW_TICK_MS = 50;
+
+  // Re-armed every time the finale page is (re-)rendered — a fresh visit
+  // after a previous blow-out gets unlit candles re-lit and a working
+  // button again, since nothing else in the project defines an "after
+  // finale" behavior to hand off to instead.
+  resetBlowInteraction(layer) {
+    this.stopListening(layer);
+    layer.blow.state = 'idle';
+    layer.blow.progress = 0;
+    layer.blow.isBlowingNow = false;
+    layer.candlesExtinguished = false;
+
+    layer.wishText.setVisible(true);
+    layer.statusText.setVisible(false).setText('');
+    layer.blowButtonText.setText('Tap to blow');
+    layer.blowButton.setVisible(true).setInteractive();
+    layer.progressBarBg.setVisible(false);
+    layer.progressBarFill.setVisible(false).setSize(1, PostcardScene.BLOW_BAR_HEIGHT - 4);
+
+    layer.flames.forEach((flame) => {
+      flame.setVisible(true).setAlpha(1);
+      flame.setPosition(flame.getData('baseX'), flame.getData('baseY'));
+      flame.setScale(flame.getData('baseScaleX'), flame.getData('baseScaleY'));
+      flame.setAngle(0);
+    });
+  }
+
+  // This is the direct user gesture getUserMedia() needs — called
+  // straight from the button's pointerdown handler, not deferred.
+  async handleBlowButtonTap(layer) {
+    if (layer.blow.state !== 'idle' && layer.blow.state !== 'error') return;
+    layer.blow.state = 'requesting';
+    layer.blowButton.disableInteractive().setVisible(false);
+    layer.statusText.setVisible(false);
+    layer.blow.progress = 0;
+    layer.progressBarFill.setSize(1, PostcardScene.BLOW_BAR_HEIGHT - 4);
+    layer.progressBarBg.setVisible(true);
+    layer.progressBarFill.setVisible(true);
+
+    try {
+      const session = await startMicVolumeMeter();
+      // The user could have paged away while the permission prompt was
+      // up — don't start listening into a page that's no longer showing.
+      if (layer.blow.state !== 'requesting') {
+        session.stop();
+        return;
+      }
+      layer.blow.micSession = session;
+      layer.blow.state = 'listening';
+      this.startListening(layer);
+    } catch (err) {
+      if (layer.blow.state !== 'requesting') return;
+      layer.blow.state = 'error';
+      layer.progressBarBg.setVisible(false);
+      layer.progressBarFill.setVisible(false);
+      layer.statusText.setText('Mic access needed to blow out the candles — tap to try again').setVisible(true);
+      layer.blowButtonText.setText('Try Again');
+      layer.blowButton.setVisible(true).setInteractive();
+    }
+  }
+
+  startListening(layer) {
+    let lastTime = this.time.now;
+    const tickEvent = this.time.addEvent({
+      delay: PostcardScene.BLOW_TICK_MS,
+      loop: true,
+      callback: () => {
+        const now = this.time.now;
+        const dt = (now - lastTime) / 1000;
+        lastTime = now;
+
+        const volume = layer.blow.micSession.getVolume();
+        layer.blow.isBlowingNow = volume > PostcardScene.BLOW_VOLUME_THRESHOLD;
+
+        const rate = layer.blow.isBlowingNow ? PostcardScene.BLOW_FILL_RATE : -PostcardScene.BLOW_DECAY_RATE;
+        layer.blow.progress = Phaser.Math.Clamp(layer.blow.progress + rate * dt, 0, 1);
+
+        const fillWidth = Math.max(1, layer.blow.progress * (PostcardScene.BLOW_BAR_WIDTH - 4));
+        layer.progressBarFill.setSize(fillWidth, PostcardScene.BLOW_BAR_HEIGHT - 4);
+
+        if (layer.blow.progress >= 1) {
+          this.completeBlowOut(layer);
+        }
+      },
+    });
+    layer.blow.tickEvent = tickEvent;
+  }
+
+  // Cleanup used both when a blow completes and when the user simply
+  // navigates away mid-listening (called from goToPage) — releases the
+  // mic stream rather than leaving it listening in the background.
+  stopListening(layer) {
+    if (layer.blow.tickEvent) {
+      layer.blow.tickEvent.remove();
+      layer.blow.tickEvent = null;
+    }
+    if (layer.blow.micSession) {
+      layer.blow.micSession.stop();
+      layer.blow.micSession = null;
+    }
+    layer.blow.isBlowingNow = false;
+  }
+
+  completeBlowOut(layer) {
+    this.stopListening(layer);
+    layer.blow.state = 'done';
+    layer.progressBarBg.setVisible(false);
+    layer.progressBarFill.setVisible(false);
+    layer.candlesExtinguished = true;
+
+    layer.flames.forEach((flame) => this.extinguishFlame(flame, layer.container));
+  }
+
+  // The "blown out by wind" animation: a quick sharp stretch/lean to one
+  // side (as if wind just hit it) that rapidly shrinks to nothing, over a
+  // few hundred ms — a real eased tween, unlike the idle/blowing flicker's
+  // deliberate hard cuts, since this is a one-shot dramatic beat rather
+  // than a repeating stop-motion loop. Finishes hidden and reset back to
+  // its resting pose (so a future re-light via resetBlowInteraction has a
+  // clean starting point), plus a small soft puff at the wick.
+  extinguishFlame(flame, container) {
+    const flickerEvent = flame.getData('flickerEvent');
+    if (flickerEvent) flickerEvent.remove();
+
+    const baseX = flame.getData('baseX');
+    const baseY = flame.getData('baseY');
+    const baseScaleX = flame.getData('baseScaleX');
+    const baseScaleY = flame.getData('baseScaleY');
+    const leanDir = Math.random() < 0.5 ? -1 : 1;
+
+    this.tweens.add({
+      targets: flame,
+      scaleX: baseScaleX * 0.3,
+      scaleY: baseScaleY * 1.6,
+      angle: leanDir * 55,
+      x: baseX + leanDir * 16,
+      duration: 220,
+      ease: 'Cubic.easeIn',
+      onComplete: () => {
+        this.tweens.add({
+          targets: flame,
+          scaleX: 0.01,
+          scaleY: 0.01,
+          alpha: 0,
+          duration: 140,
+          ease: 'Cubic.easeIn',
+          onComplete: () => {
+            flame
+              .setVisible(false)
+              .setAlpha(1)
+              .setScale(baseScaleX, baseScaleY)
+              .setAngle(0)
+              .setPosition(baseX, baseY);
+          },
+        });
+      },
+    });
+
+    this.spawnPuff(container, baseX, baseY);
+  }
+
+  // Lightweight nice-to-have: a small soft circle that drifts up and
+  // fades — no separate asset needed. Added into the same container as
+  // the flame (rather than the scene root) so it inherits the page
+  // layer's own position/scale/alpha for its short lifetime.
+  spawnPuff(container, x, y) {
+    const puff = this.add.circle(x, y, 10, 0xffffff, 0.5);
+    container.add(puff);
+    this.tweens.add({
+      targets: puff,
+      scale: 2.4,
+      alpha: 0,
+      y: y - 14,
+      duration: 420,
+      ease: 'Sine.easeOut',
+      onComplete: () => puff.destroy(),
     });
   }
 
@@ -376,6 +756,11 @@ export class PostcardScene extends Phaser.Scene {
     const outgoing = this.pageLayers[this.activeLayerIndex];
     const incomingIndex = 1 - this.activeLayerIndex;
     const incoming = this.pageLayers[incomingIndex];
+
+    // Release the mic immediately if the user navigates away mid-blow —
+    // it should never keep listening in the background once the finale
+    // page isn't the one showing.
+    this.stopListening(outgoing);
 
     // A real crossfade: render the new page into the OTHER layer while
     // it's invisible, then fade both layers at once — outgoing 1->0 and
@@ -490,15 +875,12 @@ export class PostcardScene extends Phaser.Scene {
   }
 
   // ---------------------------------------------------------------------
-  // BLOW-OUT-THE-CANDLES HAND-OFF (stub): the finale page itself (cake
-  // card + flickering candle flames, buildFinaleVisuals() above) is
-  // implemented.
-  // Still not implemented: the mic-based "blow out the candles"
-  // interaction that would extinguish the flames on this page. That will
-  // need getUserMedia + AnalyserNode volume detection, and per browser
-  // autoplay/permission rules the mic prompt MUST be triggered from a
-  // direct user tap (e.g. a "light the candle" button), never on scene
-  // load. The "paper-photo" page type remains unimplemented too (see the
-  // schema comment in data.js).
+  // The finale page (cake card + flickering candle flames,
+  // buildFinaleVisuals()) and the mic-based "blow out the candles"
+  // interaction (buildBlowInteraction() + handleBlowButtonTap()
+  // onward) are both implemented. Not implemented: sound effects for
+  // any of this (see core/js/audio.js — still a no-op stub), and the
+  // "paper-photo" page type's photo slot stays a plain empty polaroid
+  // frame (no actual photo compositing).
   // ---------------------------------------------------------------------
 }

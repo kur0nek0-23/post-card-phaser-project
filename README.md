@@ -42,28 +42,33 @@ No file under `/core/` needs to change for a new postcard site.
 - `/postcards/example/` — a working postcard built from the template, using
   real art and a seeded 4-page birthday message (3 letter pages + finale).
 
+## Blow-out-the-candles interaction
+
+The finale page's candles are for real: `layout.finale` in `data.js`
+positions four candle flames (`core/js/PostcardScene.js`,
+`buildFinaleVisuals()`) with an idle stop-motion flicker
+(`startFlameFlicker()`). Tapping "Tap to blow" requests the mic
+(`core/js/candleMic.js` wraps the `getUserMedia`/`AnalyserNode` plumbing;
+the request itself happens directly inside the button's tap handler,
+`handleBlowButtonTap()`, since browsers require that gesture — never on
+page/scene load). Granted mic access feeds a fill/decay progress bar
+(`startListening()`) that intensifies the flame flicker while blowing;
+completing it plays a wind-blown extinguish animation
+(`extinguishFlame()`) and releases the mic. Denied/unavailable mic access
+shows an inline retry message instead of leaving the user stuck.
+`BLOW_VOLUME_THRESHOLD`/`BLOW_FILL_RATE`/`BLOW_DECAY_RATE` (top of that
+section in `PostcardScene.js`) are the numbers to retune against a real
+mic if the sensitivity ever feels off.
+
 ## Stubs — not implemented yet
 
-These are deliberately out of scope for this build, but the surrounding
-code leaves clear seams for them:
-
-- **`paper-photo` page type.** The `pages` schema in every `data.js`
-  documents this as a reserved value. `PostcardScene` renders `"paper"`
-  and `"finale"` today, not this one.
-- **Blow-out-the-candles interaction.** The `"finale"` page itself (cake
-  card + flickering candle flames) is implemented — see `buildFinale()` in
-  `PostcardScene.js`. Not implemented: extinguishing those flames via mic
-  input. See the stub comment at the bottom of `PostcardScene.js` for
-  where this wires in. When it's built: the mic permission prompt
-  (`getUserMedia` + `AnalyserNode` volume detection) must be requested
-  from a direct user tap (e.g. a "light the candle" button), never on
-  page/scene load — browsers will block or the user will be confused by
-  an unprompted permission dialog otherwise.
 - **Real audio.** `core/js/audio.js` exports no-op `init()`/`play(name)`
   functions. The intended real implementation is Phaser's built-in Sound
   Manager: load clips in `BootScene` with `this.load.audio(...)`, and swap
-  `play()`'s body for `scene.sound.play(name)`.
-
-The polaroid frame asset already in `/assets/` at the repo root belongs to
-the still-unimplemented `paper-photo` stub and isn't referenced by any
-postcard site yet.
+  `play()`'s body for `scene.sound.play(name)`. This includes any sound
+  for the blow-out interaction above — it's mic input and visuals only
+  right now, no audio feedback.
+- **Photo compositing for `"paper-photo"` pages.** The polaroid overlay
+  itself renders (`buildPolaroidOverlay()`), but always shows the frame's
+  own blank/empty photo window — there's no mechanism yet for compositing
+  an actual photo image into that window.
