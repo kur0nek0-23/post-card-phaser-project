@@ -219,6 +219,10 @@ export class PostcardScene extends Phaser.Scene {
     container.add(bodyText);
 
     const { finaleImage, flames } = this.buildFinaleVisuals(container, width);
+    // Added last so it draws on top of the paper and its text regardless
+    // of body length — it's an overlay sitting above the page, not
+    // content composited inside the paper's own printed area.
+    const polaroidImage = this.buildPolaroidOverlay(container);
 
     return {
       container,
@@ -227,19 +231,41 @@ export class PostcardScene extends Phaser.Scene {
       bodyText,
       finaleImage,
       flames,
+      polaroidImage,
       textLayout: { textAreaWidth, textTop, textBottom },
     };
+  }
+
+  // `paperPhoto` positions the polaroid for the "paper-photo" page type —
+  // see the comment on layout.paperPhoto in data.js for what x/y/rotation
+  // mean and how to adjust them.
+  buildPolaroidOverlay(container) {
+    const photo = this.layout.paperPhoto;
+    if (!photo || !this.textures.exists('polaroidFrame')) return null;
+
+    const texture = this.textures.get('polaroidFrame').getSourceImage();
+    const scale = photo.width / texture.width;
+
+    const polaroidImage = this.add
+      .image(photo.x, photo.y, 'polaroidFrame')
+      .setScale(scale)
+      .setAngle(photo.rotation || 0)
+      .setVisible(false);
+    container.add(polaroidImage);
+    return polaroidImage;
   }
 
   renderPageLayer(layer, index) {
     const page = this.pages[index];
     const isFinale = page.type === 'finale';
+    const showPolaroid = page.type === 'paper-photo';
 
     layer.paperImage.setVisible(!isFinale);
     layer.titleText.setVisible(!isFinale);
     layer.bodyText.setVisible(!isFinale);
     if (layer.finaleImage) layer.finaleImage.setVisible(isFinale);
     layer.flames.forEach((flame) => flame.setVisible(isFinale));
+    if (layer.polaroidImage) layer.polaroidImage.setVisible(showPolaroid);
 
     if (isFinale) return; // finale card is fully baked art — no text to lay out
 

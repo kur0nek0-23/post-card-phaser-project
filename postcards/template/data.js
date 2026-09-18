@@ -54,15 +54,20 @@ export const layout = {
 
 // Data-driven page array. Every entry is { id, type, title, body }.
 //
-// "paper" and "finale" are implemented by PostcardScene. One more type is
-// reserved for later without changing this shape:
-//   - "paper-photo": a paper page with a polaroid photo composited on top,
-//     alongside title/body text.
-// "finale" renders the cake + "Happy Birthday" lettering card (finaleCard)
-// with flickering candle flames on top; title/body are unused for this
-// type since the card art is fully baked. The mic-based blow-out-the-
-// candle interaction is a separate future feature — see the stub comment
-// at the bottom of PostcardScene.js.
+// "paper", "paper-photo", and "finale" are all implemented by
+// PostcardScene:
+//   - "paper": title/body text on the paper background.
+//   - "paper-photo": same paper + title/body as "paper", plus a polaroid
+//     overlay (needs `polaroidFrame` in `assets` above and a
+//     `layout.paperPhoto: { width, x, y, rotation }` — see
+//     postcards/example/data.js for a working example) laid over the
+//     paper's bottom-right corner, not composited inside its frame. Not
+//     used in this starter's own seed page below.
+//   - "finale": renders the cake + "Happy Birthday" lettering card
+//     (finaleCard) with flickering candle flames on top; title/body are
+//     unused since the card art is fully baked. The mic-based blow-out-
+//     the-candle interaction is a separate future feature — see the stub
+//     comment at the bottom of PostcardScene.js.
 export const pages = [
   {
     id: 1,
