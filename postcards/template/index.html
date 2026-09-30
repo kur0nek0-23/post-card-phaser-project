@@ -88,11 +88,11 @@
   import { createGameConfig } from '../../core/config.js';
   import { BootScene } from '../../core/js/BootScene.js';
   import { PostcardScene } from '../../core/js/PostcardScene.js';
-  import { assets, layout, pages } from './data.js';
+  import { assets, layout, pages, sounds } from './data.js';
 
   const config = createGameConfig([BootScene, PostcardScene]);
   const game = new Phaser.Game(config);
-  game.registry.set('postcard', { assets, layout, pages });
+  game.registry.set('postcard', { assets, layout, pages, sounds });
 </script>
 </body>
 </html>

@@ -1,16 +1,20 @@
-// STUB — no real audio yet. Kept as a no-op module so PostcardScene can call
-// audio.init()/audio.play(name) unconditionally without every postcard site
-// needing to care whether sound has been implemented.
+// Thin wrapper around Phaser's built-in Sound Manager. PostcardScene calls
+// audio.init()/audio.play(name) unconditionally, without needing to know
+// whether a given postcard site actually loaded any sounds — play() is a
+// quiet no-op if the named clip was never loaded (e.g. a site with no
+// `sounds` manifest, or one missing this particular key).
 //
-// Intended real implementation: Phaser's built-in Sound Manager. In
-// BootScene, load clips with `this.load.audio(name, url)`; here, replace
-// init() with storing the scene reference and replace play() with
-// `scene.sound.play(name)`. No third-party audio library is needed.
+// Loading happens in BootScene, from each site's data.js `sounds`
+// manifest, via `this.load.audio(name, url)` — this module never loads
+// anything itself, it only plays clips the scene already has.
 
-export function init(_scene) {
-  // no-op
+let currentScene = null;
+
+export function init(scene) {
+  currentScene = scene;
 }
 
-export function play(_name) {
-  // no-op
+export function play(name, config) {
+  if (!currentScene || !currentScene.cache.audio.exists(name)) return;
+  currentScene.sound.play(name, config);
 }

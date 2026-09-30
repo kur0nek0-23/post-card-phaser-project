@@ -14,6 +14,16 @@ export const assets = {
   flame: './assets/flame-cutout.png',
 };
 
+// Sound manifest: logical key -> path relative to this file's folder.
+// BootScene loads exactly these keys (via this.load.audio), same
+// optional/omit-if-falsy convention as `assets` above. Empty here since
+// this starter has no audio of its own — see postcards/example/data.js
+// for a working example (background music plus a few sound effects:
+// PostcardScene plays `bgMusic`, `envelopeOpen`, `paperFlip`, and
+// `candleBlow` by those exact key names at the relevant moments, so
+// adding those four keys here is enough to wire sound into a new site).
+export const sounds = {};
+
 // Layout: where things sit in the 750x1334 design-resolution canvas
 // (core/config.js). These numbers are specific to the geometry of the art
 // above (e.g. `hotspot` marks where this envelope's baked-in peeking paper

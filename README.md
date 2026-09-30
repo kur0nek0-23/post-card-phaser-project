@@ -37,7 +37,8 @@ No file under `/core/` needs to change for a new postcard site.
   - `js/BootScene.js` — preload scene; loads whatever's in the site's
     `data.js` `assets` manifest.
   - `js/PostcardScene.js` — the envelope → letter → paged-pages flow.
-  - `js/audio.js` — stub (see below).
+  - `js/audio.js` — thin wrapper around Phaser's Sound Manager; plays
+    whatever a site loaded via its `sounds` manifest (see below).
 - `/postcards/template/` — starter scaffold.
 - `/postcards/example/` — a working postcard built from the template, using
   real art and a seeded 4-page birthday message (3 letter pages + finale).
@@ -60,14 +61,27 @@ shows an inline retry message instead of leaving the user stuck.
 section in `PostcardScene.js`) are the numbers to retune against a real
 mic if the sensitivity ever feels off.
 
+## Audio
+
+A site opts into sound by adding a `sounds` manifest to its `data.js`
+(same key -> path shape as `assets`, loaded via `this.load.audio` in
+BootScene instead of `this.load.image`) and passing it into the registry
+in `index.html` alongside `assets`/`layout`/`pages`. `core/js/audio.js`'s
+`play(name)` is a quiet no-op for any key a site didn't load — a site
+with no `sounds` manifest at all (like `postcards/template`) works
+exactly as before.
+
+`postcards/example` wires up four clips PostcardScene already calls by
+name: `bgMusic` (starts once the closed envelope's zoom/fade-in intro
+finishes), `envelopeOpen` (tapping the closed envelope),
+`paperFlip` (every page turn, either direction), and `candleBlow`
+(finishing the blow-out). Browsers require a user gesture before audio
+can actually start, so `bgMusic`'s autoplay attempt may be silently
+queued by Phaser until the very next tap unlocks audio, rather than
+playing the instant the envelope appears, on some browsers.
+
 ## Stubs — not implemented yet
 
-- **Real audio.** `core/js/audio.js` exports no-op `init()`/`play(name)`
-  functions. The intended real implementation is Phaser's built-in Sound
-  Manager: load clips in `BootScene` with `this.load.audio(...)`, and swap
-  `play()`'s body for `scene.sound.play(name)`. This includes any sound
-  for the blow-out interaction above — it's mic input and visuals only
-  right now, no audio feedback.
 - **A photo actually inside the polaroid frame's die-cut window.** Any
   page can overlay a photo now (see the `photo` field in the pages-array
   schema comment in data.js, and `buildPhotoOverlay()` in

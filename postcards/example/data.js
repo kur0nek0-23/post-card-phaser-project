@@ -21,6 +21,19 @@ export const assets = {
   image5: './assets/Image_5.jpg',
 };
 
+// Sound manifest: logical key -> path relative to this file's folder.
+// BootScene loads exactly these keys (via this.load.audio), same
+// optional/omit-if-falsy convention as `assets` above. Separate object
+// (and separate Phaser cache) from `assets`, so a sound and an image can
+// safely share the same key name — `envelopeOpen` below is unrelated to
+// the `envelopeOpen` image above.
+export const sounds = {
+  bgMusic: './assets/BG-Music.mp3',
+  envelopeOpen: './assets/envelope-open.mp3',
+  paperFlip: './assets/paper-flip.mp3',
+  candleBlow: './assets/candle-blow.mp3',
+};
+
 // Layout: where things sit in the 750x1334 design-resolution canvas
 // (core/config.js). These numbers are specific to the geometry of the art
 // above (e.g. `hotspot` marks where this envelope's baked-in peeking paper
@@ -112,7 +125,7 @@ export const pages = [
     // Image_1.jpg is portrait (0.75 aspect) — width picked so its height
     // lands around the same ~310px footprint as the others below, so all
     // five read as a consistent size despite differing aspect ratios.
-    photo: { asset: 'image1', width: 230, x: -8, y: 280, rotation: -5 },
+    photo: { asset: 'image1', width: 300, x: -8, y: 200, rotation: -5 },
   },
   {
     id: 2,
@@ -122,7 +135,7 @@ export const pages = [
       "I hope your day is filled with all your favorite things: " +
       "good food, good friends, good vibes, and so much more. " +
       "May this new year of your life be your best one yet!",
-    photo: { asset: 'image2', width: 310, x: 6, y: 280, rotation: 4 },
+    photo: { asset: 'image2', width: 400, x: 6, y: 200, rotation: 4 },
   },
   {
     id: 3,
@@ -134,7 +147,7 @@ export const pages = [
       "and get sad and sensitive, even when you try to act tough. " +
       "I may not know every part of you, but I treasure everything " +
       "you've shared with me.",
-    photo: { asset: 'image3', width: 310, x: -5, y: 280, rotation: -6 },
+    photo: { asset: 'image3', width: 550, x: -5, y: 200, rotation: -6 },
   },
   {
     id: 4,
@@ -148,7 +161,7 @@ export const pages = [
       "The tears you cried, the anger you let out.\n" +
       "All the secrets you trusted me with.\n\n" +
       "Every one of those moments brought me closer to you, heart to heart.",
-    photo: { asset: 'image4', width: 310, x: 8, y: 280, rotation: 5 },
+    photo: { asset: 'image4', width: 400, x: 8, y: 250, rotation: 5 },
   },
   {
     id: 5,

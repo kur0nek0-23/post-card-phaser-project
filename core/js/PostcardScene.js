@@ -32,11 +32,11 @@ export class PostcardScene extends Phaser.Scene {
     this.buildLetter();
     this.buildNavZones();
     this.buildNavButtons();
-    this.buildProgressDots();
 
     audio.init(this);
 
     this.enterClosedState();
+    this.playEnvelopeIntro();
   }
 
   // ---- background -------------------------------------------------------
@@ -56,18 +56,47 @@ export class PostcardScene extends Phaser.Scene {
   buildEnvelope() {
     const { x, y, width } = this.layout.envelope;
     const scale = width / this.textures.get('envelopeClosed').getSourceImage().width;
+    this.envelopeBaseScale = scale;
 
-    this.envelopeClosed = this.add.image(x, y, 'envelopeClosed').setScale(scale).setDepth(0);
+    // Starts zoomed out slightly and fully transparent — playEnvelopeIntro()
+    // (called once, right after create()) tweens it in rather than it
+    // just appearing on a sudden cut. Not interactive yet: tapping mid
+    // zoom-in would fight the intro tween over the same alpha property,
+    // so this only gets enabled once that tween's onComplete fires.
+    this.envelopeClosed = this.add.image(x, y, 'envelopeClosed').setScale(scale * 0.85).setAlpha(0).setDepth(0);
     this.envelopeOpen = this.add.image(x, y, 'envelopeOpen').setScale(scale).setDepth(0).setAlpha(0);
 
     this.envelopeClosed.setInteractive({ useHandCursor: true });
+    this.envelopeClosed.disableInteractive();
     this.envelopeClosed.on('pointerdown', () => this.openEnvelope());
+  }
+
+  // Zoom/fade-in for the closed envelope's first appearance, instead of a
+  // sudden cut. Background music starts right as this finishes — "right
+  // after the envelope appears" — via audio.play(), though note that
+  // browsers require a user gesture before audio can actually start;
+  // Phaser's Sound Manager queues it and it plays as soon as the first
+  // tap (almost certainly the very next thing the user does, opening the
+  // envelope) unlocks audio, rather than failing silently forever.
+  playEnvelopeIntro() {
+    this.tweens.add({
+      targets: this.envelopeClosed,
+      alpha: 1,
+      scale: this.envelopeBaseScale,
+      duration: 650,
+      ease: 'Back.easeOut',
+      onComplete: () => {
+        this.envelopeClosed.setInteractive();
+        audio.play('bgMusic', { loop: true, volume: 0.5 });
+      },
+    });
   }
 
   openEnvelope() {
     if (this.state !== 'closed') return;
     this.state = 'transitioning-open';
     this.envelopeClosed.disableInteractive();
+    audio.play('envelopeOpen');
 
     // Crossfade closed -> open, with a quick subtle scale/settle so the
     // swap doesn't feel like a flat cut.
@@ -161,9 +190,7 @@ export class PostcardScene extends Phaser.Scene {
     this.rightZone.setInteractive();
     this.prevButton.setInteractive().setVisible(true);
     this.nextButton.setInteractive().setVisible(true);
-    this.dots.forEach((dot) => dot.setVisible(true));
     this.renderPageLayer(this.pageLayers[this.activeLayerIndex], this.currentIndex);
-    this.updateProgressDots();
   }
 
   // ---- letter / paper -----------------------------------------------------
@@ -722,6 +749,7 @@ export class PostcardScene extends Phaser.Scene {
     layer.progressBarBg.setVisible(false);
     layer.progressBarFill.setVisible(false);
     layer.candlesExtinguished = true;
+    audio.play('candleBlow');
 
     layer.flames.forEach((flame) => this.extinguishFlame(flame, layer.container));
   }
@@ -809,7 +837,7 @@ export class PostcardScene extends Phaser.Scene {
 
     this.isTransitioning = true;
     this.currentIndex = next;
-    this.updateProgressDots();
+    audio.play('paperFlip');
 
     const outgoing = this.pageLayers[this.activeLayerIndex];
     const incomingIndex = 1 - this.activeLayerIndex;
@@ -906,30 +934,6 @@ export class PostcardScene extends Phaser.Scene {
     container.disableInteractive();
     container.on('pointerdown', onClick);
     return container;
-  }
-
-  // ---- progress dots --------------------------------------------------------
-
-  buildProgressDots() {
-    const total = this.pages.length;
-    const spacing = 32;
-    const startX = DESIGN_WIDTH / 2 - ((total - 1) * spacing) / 2;
-    const y = 1300;
-
-    this.dots = [];
-    for (let i = 0; i < total; i++) {
-      // Dark warm tone (matches the letter text color) rather than white,
-      // since this sits over a light cream background where white dots
-      // would have almost no contrast.
-      const dot = this.add.circle(startX + i * spacing, y, 7, 0x3a2f28, 0.3).setDepth(2).setVisible(false);
-      this.dots.push(dot);
-    }
-  }
-
-  updateProgressDots() {
-    this.dots.forEach((dot, i) => {
-      dot.setFillStyle(0x3a2f28, i === this.currentIndex ? 1 : 0.3);
-    });
   }
 
   // ---------------------------------------------------------------------
