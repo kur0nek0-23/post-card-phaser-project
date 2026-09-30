@@ -13,6 +13,7 @@ export const assets = {
   finaleCard: './assets/birthday-card.png',
   flame: './assets/flame-cutout.png',
   polaroidFrame: './assets/polaroid-frame-cutout.png',
+  portraitFinal: './assets/Portrait-final.png',
 };
 
 // Layout: where things sit in the 750x1334 design-resolution canvas
@@ -52,35 +53,35 @@ export const layout = {
       { x: 67, y: -29 },
     ],
   },
-  // `paperPhoto` positions the polaroid overlay for the "paper-photo" page
-  // type below. `x`/`y` are offsets from the paper's own center (local to
-  // the same space as `finale.candles` above) — NOT clamped to the paper's
-  // own printed area, since it's meant to overhang the paper's edge rather
-  // than sit inside its frame. `width` is the polaroid's own full-canvas
-  // display width (same convention as `paper.width`/`envelope.width`), and
+  // Photo overlays are configured per-page now (see the `photo` field on
+  // individual entries in `pages` below), not here — different pages want
+  // different images in different spots. `x`/`y` on a page's `photo` are
+  // offsets from the paper's own center (local to the same space as
+  // `finale.candles` above); `width` is the image's own full-canvas
+  // display width (same convention as `paper.width`/`envelope.width`);
   // `rotation` is in degrees.
   //
-  // Same clipping trap as envelope.width above, just easier to hit by
-  // accident here since this sits near a corner: push `x`/`width` too far
-  // and the ROTATED image's bounding box (bigger than the unrotated one —
-  // a tilted rectangle's corners sweep out further) crosses the 750px
-  // design canvas edge and gets clipped, same as any other canvas content.
-  // At width: 280, x: 180 the image's own bounds (Phaser's getBounds(),
-  // checked directly rather than estimated) sit ~27px inside the edge; x:
-  // 270 overflowed it by ~63px. If you push this further out, verify
-  // against getBounds() rather than eyeballing it — rotation makes the
-  // safe range harder to guess than the envelope's was.
-  paperPhoto: { width: 280, x: 180, y: 380, rotation: 8 },
+  // Watch for the same clipping trap as envelope.width above when placing
+  // one near an edge (e.g. the "PS" page's polaroid, which deliberately
+  // overhangs the paper's own edge): a ROTATED image's bounding box is
+  // bigger than its unrotated one — a tilted rectangle's corners sweep
+  // out further — and can cross the 750px design canvas edge and get
+  // clipped, same as any other canvas content. Verify against the
+  // object's actual getBounds() rather than eyeballing it if you push one
+  // out close to an edge; rotation makes the safe range harder to guess
+  // than the envelope's was.
 };
 
-// Data-driven page array. Every entry is { id, type, title, body }.
+// Data-driven page array. Every entry is { id, type, title, body, photo? }.
 //
-// "paper", "paper-photo", and "finale" are all implemented by
-// PostcardScene:
-//   - "paper": title/body text on the paper background.
-//   - "paper-photo": same paper + title/body as "paper", plus the
-//     polaroid overlay (see `layout.paperPhoto`) on top — it's laid over
-//     the paper's bottom-right corner, not composited inside its frame.
+// "paper" and "finale" are the two page types PostcardScene implements:
+//   - "paper": title/body text on the paper background. Optionally add a
+//     `photo` field — { asset, width, x, y, rotation } — to overlay an
+//     image on top of the paper and its text (e.g. a polaroid or a full
+//     photo); see `layout` above for what those fields mean, and the "PS"
+//     and "One more thing..." pages below for two different examples
+//     (one overhanging the paper's corner, one contained within it).
+//     Omit `photo` for a plain text-only page.
 //   - "finale": renders the cake + "Happy Birthday" lettering card
 //     (finaleCard) with flickering candle flames on top; title/body are
 //     unused since the card art is fully baked. The mic-based blow-out-
@@ -99,26 +100,23 @@ export const pages = [
   },
   {
     id: 2,
-    type: 'paper-photo',
+    type: 'paper',
     title: 'PS',
     body: 'You\'re the best.',
+    // Deliberately overhangs the paper's bottom-right corner rather than
+    // sitting inside its printed area — see the clipping-trap note above.
+    photo: { asset: 'polaroidFrame', width: 280, x: 180, y: 380, rotation: 8 },
   },
   {
     id: 3,
     type: 'paper',
     title: 'One more thing...',
     body:
-      "I've been trying to think of the perfect way to say this, so " +
-      "here goes: knowing you has made every year better than the one " +
-      "before it, and I don't say that lightly.\n\n" +
-      "Thank you for the late-night conversations, the terrible jokes " +
-      "you insist on telling, and for always showing up when it " +
-      "actually matters. Not everyone gets a friend like that, and I " +
-      "know exactly how lucky I am.\n\n" +
-      "So here's to another trip around the sun — may it bring you " +
-      "just as much joy as you bring everyone around you. Happy " +
-      "birthday, truly. I can't wait to see what this year has in " +
-      "store for you.",
+      "TEST PARAGRAPH",
+    // Contained within the paper's own printed area (not overhanging its
+    // edge like the polaroid above) — sits near the bottom, tilted, on
+    // top of whatever text is underneath it.
+    photo: { asset: 'portraitFinal', width: 420, x: 0, y: 280, rotation: -5 },
   },
   {
     id: 4,

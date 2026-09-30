@@ -229,7 +229,7 @@ export class PostcardScene extends Phaser.Scene {
 
     const { finaleImage, flames } = this.buildFinaleVisuals(container, width, blow, flameFlickerEvents);
     // Added after the finale visuals so it draws on top of them, and
-    // before the polaroid so the polaroid (unrelated to the finale page)
+    // before the photo overlay so that (unrelated to the finale page)
     // stays on top of everything as before.
     // `layerRef` is a forward reference: the blow button's tap handler
     // needs the full, finished layer object (to reach the progress bar,
@@ -238,7 +238,7 @@ export class PostcardScene extends Phaser.Scene {
     // end, and the handler (called later, on an actual tap) reads it then.
     const layerRef = {};
     const blowUI = this.buildBlowInteraction(container, layerRef, width);
-    const polaroidImage = this.buildPolaroidOverlay(container);
+    const photoImage = this.buildPhotoOverlay(container);
 
     const layer = {
       container,
@@ -247,7 +247,7 @@ export class PostcardScene extends Phaser.Scene {
       bodyText,
       finaleImage,
       flames,
-      polaroidImage,
+      photoImage,
       textLayout: { textAreaWidth, textTop, textBottom },
       blow,
       flameFlickerEvents,
@@ -364,35 +364,47 @@ export class PostcardScene extends Phaser.Scene {
     return { wishText, statusText, blowButton, blowButtonText, progressBarBg, progressBarFill };
   }
 
-  // `paperPhoto` positions the polaroid for the "paper-photo" page type —
-  // see the comment on layout.paperPhoto in data.js for what x/y/rotation
-  // mean and how to adjust them.
-  buildPolaroidOverlay(container) {
-    const photo = this.layout.paperPhoto;
-    if (!photo || !this.textures.exists('polaroidFrame')) return null;
-
-    const texture = this.textures.get('polaroidFrame').getSourceImage();
-    const scale = photo.width / texture.width;
-
-    const polaroidImage = this.add
-      .image(photo.x, photo.y, 'polaroidFrame')
-      .setScale(scale)
-      .setAngle(photo.rotation || 0)
-      .setVisible(false);
-    container.add(polaroidImage);
-    return polaroidImage;
+  // A generic photo-overlay Image, re-skinned per page by renderPageLayer
+  // below via each page's own optional `photo` field — not tied to one
+  // fixed texture/position the way the old single `layout.paperPhoto`
+  // was, since different pages want different images in different spots
+  // (e.g. the polaroid on the "PS" page vs. a full photo on "One more
+  // thing..."). Starts on Phaser's built-in placeholder texture since an
+  // Image needs *some* texture at creation; renderPageLayer always swaps
+  // it before ever showing it.
+  buildPhotoOverlay(container) {
+    const photoImage = this.add.image(0, 0, '__DEFAULT').setVisible(false);
+    container.add(photoImage);
+    return photoImage;
   }
 
   renderPageLayer(layer, index) {
     const page = this.pages[index];
     const isFinale = page.type === 'finale';
-    const showPolaroid = page.type === 'paper-photo';
+    const photo = page.photo;
 
     layer.paperImage.setVisible(!isFinale);
     layer.titleText.setVisible(!isFinale);
     layer.bodyText.setVisible(!isFinale);
     if (layer.finaleImage) layer.finaleImage.setVisible(isFinale);
-    if (layer.polaroidImage) layer.polaroidImage.setVisible(showPolaroid);
+
+    // `photo` on a page is { asset, width, x, y, rotation } — see the
+    // schema comment in data.js. `x`/`y` are local offsets from the
+    // paper's own center, same space as everything else on the page.
+    if (layer.photoImage) {
+      if (!isFinale && photo && this.textures.exists(photo.asset)) {
+        const texture = this.textures.get(photo.asset).getSourceImage();
+        const scale = photo.width / texture.width;
+        layer.photoImage
+          .setTexture(photo.asset)
+          .setScale(scale)
+          .setAngle(photo.rotation || 0)
+          .setPosition(photo.x, photo.y)
+          .setVisible(true);
+      } else {
+        layer.photoImage.setVisible(false);
+      }
+    }
 
     if (isFinale) {
       // Fresh visit (or a re-visit after a previous blow-out) — reset the

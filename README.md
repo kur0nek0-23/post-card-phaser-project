@@ -68,7 +68,11 @@ mic if the sensitivity ever feels off.
   `play()`'s body for `scene.sound.play(name)`. This includes any sound
   for the blow-out interaction above — it's mic input and visuals only
   right now, no audio feedback.
-- **Photo compositing for `"paper-photo"` pages.** The polaroid overlay
-  itself renders (`buildPolaroidOverlay()`), but always shows the frame's
-  own blank/empty photo window — there's no mechanism yet for compositing
-  an actual photo image into that window.
+- **A photo actually inside the polaroid frame's die-cut window.** Any
+  page can overlay a photo now (see the `photo` field in the pages-array
+  schema comment in data.js, and `buildPhotoOverlay()` in
+  PostcardScene.js) — the "One more thing..." example page in
+  postcards/example uses this for a full photo. What's still missing is
+  compositing a *second* image specifically into the polaroid frame's
+  blank window (as used on the "PS" page) — today that window just stays
+  empty/blank, since the frame is the only image there.
