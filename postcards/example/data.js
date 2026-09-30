@@ -62,8 +62,9 @@ export const layout = {
   // `rotation` is in degrees.
   //
   // Watch for the same clipping trap as envelope.width above when placing
-  // one near an edge (e.g. the "PS" page's polaroid, which deliberately
-  // overhangs the paper's own edge): a ROTATED image's bounding box is
+  // one near an edge (e.g. a polaroid deliberately overhanging the
+  // paper's own corner, the way `polaroidFrame` was used previously — see
+  // git history for a worked example): a ROTATED image's bounding box is
   // bigger than its unrotated one — a tilted rectangle's corners sweep
   // out further — and can cross the 750px design canvas edge and get
   // clipped, same as any other canvas content. Verify against the
@@ -78,9 +79,9 @@ export const layout = {
 //   - "paper": title/body text on the paper background. Optionally add a
 //     `photo` field — { asset, width, x, y, rotation } — to overlay an
 //     image on top of the paper and its text (e.g. a polaroid or a full
-//     photo); see `layout` above for what those fields mean, and the "PS"
-//     and "One more thing..." pages below for two different examples
-//     (one overhanging the paper's corner, one contained within it).
+//     photo); see `layout` above for what those fields mean, and the last
+//     "paper" page below for a worked example (a photo kept fully inside
+//     the paper's printed area, rather than overhanging its corner).
 //     Omit `photo` for a plain text-only page.
 //   - "finale": renders the cake + "Happy Birthday" lettering card
 //     (finaleCard) with flickering candle flames on top; title/body are
@@ -91,35 +92,74 @@ export const pages = [
   {
     id: 1,
     type: 'paper',
-    title: 'Happy Birthday!',
+    title: 'Happy Birthday, Tha Ngal Chin!',
     body:
-      "Wishing you the happiest of birthdays! I hope your day is filled " +
-      "with all your favorite things — good food, good company, and " +
-      "maybe a little too much cake. Here's to another year of you " +
-      "being exactly as wonderful as you are.",
+      "I hope your day is filled with all your favorite things: " +
+      "good food, good friends, good vibes, and so much more. " +
+      "May this new year of your life be your best one yet!",
   },
   {
     id: 2,
     type: 'paper',
-    title: 'PS',
-    body: 'You\'re the best.',
-    // Deliberately overhangs the paper's bottom-right corner rather than
-    // sitting inside its printed area — see the clipping-trap note above.
-    photo: { asset: 'polaroidFrame', width: 280, x: 180, y: 380, rotation: 8 },
+    title: '',
+    body:
+      "I hope your day is filled with all your favorite things: " +
+      "good food, good friends, good vibes, and so much more. " +
+      "May this new year of your life be your best one yet!",
   },
   {
     id: 3,
     type: 'paper',
-    title: 'One more thing...',
+    title: '',
     body:
-      "TEST PARAGRAPH",
-    // Contained within the paper's own printed area (not overhanging its
-    // edge like the polaroid above) — sits near the bottom, tilted, on
-    // top of whatever text is underneath it.
-    photo: { asset: 'portraitFinal', width: 420, x: 0, y: 280, rotation: -5 },
+      "Over these wonderful years, I've learned so much about you too. " +
+      "The way you're kind and caring. The way you feel things deeply " +
+      "and get sad and sensitive, even when you try to act tough. " +
+      "I may not know every part of you, but I treasure everything " +
+      "you've shared with me.",
   },
   {
     id: 4,
+    type: 'paper',
+    title: '',
+    body:
+      "The late-night chats.\n" +
+      "The deep conversations.\n" +
+      "The funny gossip and random trivia.\n" +
+      "The days you felt your worst and still opened up to me.\n" +
+      "The tears you cried, the anger you let out.\n" +
+      "All the secrets you trusted me with.\n\n" +
+      "Every one of those moments brought me closer to you, heart to heart.",
+  },
+  {
+    id: 5,
+    type: 'paper',
+    title: '',
+    body:
+      "Thank you for being the kind of friend I could never have asked " +
+      "for. I hope I can give back even a little of the kindness you've " +
+      "shown me. And please don't take this the wrong way, but I want " +
+      "you to know something from the bottom of my heart: I truly care " +
+      "about you, and I love you. As your friend, I'll always give you " +
+      "my deepest care and love.",
+  },
+  {
+    id: 6,
+    type: 'paper',
+    title: '',
+    body:
+      "May you have the strength to overcome any obstacle.\n" +
+      "May your future be brighter than ever.\n" +
+      "May you always smile the brightest smile.\n" +
+      "May you always be happy.\n" +
+      "And may you finally find the one true love you've always longed for.",
+    // Contained within the paper's own printed area (not overhanging its
+    // edge like a polaroid would) — sits near the bottom, tilted, on top
+    // of whatever text is underneath it.
+    photo: { asset: 'portraitFinal', width: 420, x: 0, y: 280, rotation: -5 },
+  },
+  {
+    id: 7,
     type: 'finale',
     title: '',
     body: '',
