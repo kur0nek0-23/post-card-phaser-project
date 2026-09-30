@@ -14,6 +14,11 @@ export const assets = {
   flame: './assets/flame-cutout.png',
   polaroidFrame: './assets/polaroid-frame-cutout.png',
   portraitFinal: './assets/Portrait-final.png',
+  image1: './assets/Image_1.jpg',
+  image2: './assets/Image_2.jpg',
+  image3: './assets/Image_3.png',
+  image4: './assets/Image_4.png',
+  image5: './assets/Image_5.jpg',
 };
 
 // Layout: where things sit in the 750x1334 design-resolution canvas
@@ -104,6 +109,10 @@ export const pages = [
       "I hope your day is filled with all your favorite things: " +
       "good food, good friends, good vibes, and so much more. " +
       "May this new year of your life be your best one yet!",
+    // Image_1.jpg is portrait (0.75 aspect) — width picked so its height
+    // lands around the same ~310px footprint as the others below, so all
+    // five read as a consistent size despite differing aspect ratios.
+    photo: { asset: 'image1', width: 230, x: -8, y: 280, rotation: -5 },
   },
   {
     id: 2,
@@ -113,6 +122,7 @@ export const pages = [
       "I hope your day is filled with all your favorite things: " +
       "good food, good friends, good vibes, and so much more. " +
       "May this new year of your life be your best one yet!",
+    photo: { asset: 'image2', width: 310, x: 6, y: 280, rotation: 4 },
   },
   {
     id: 3,
@@ -124,6 +134,7 @@ export const pages = [
       "and get sad and sensitive, even when you try to act tough. " +
       "I may not know every part of you, but I treasure everything " +
       "you've shared with me.",
+    photo: { asset: 'image3', width: 310, x: -5, y: 280, rotation: -6 },
   },
   {
     id: 4,
@@ -137,11 +148,15 @@ export const pages = [
       "The tears you cried, the anger you let out.\n" +
       "All the secrets you trusted me with.\n\n" +
       "Every one of those moments brought me closer to you, heart to heart.",
+    photo: { asset: 'image4', width: 310, x: 8, y: 280, rotation: 5 },
   },
   {
     id: 5,
     type: 'paper',
     title: '',
+    // Image_5.jpg is landscape (1.333 aspect) — wider than the square
+    // ones above so its height still matches their ~310px footprint.
+    photo: { asset: 'image5', width: 413, x: -6, y: 280, rotation: -4 },
     body:
       "Thank you for being the kind of friend I could never have asked " +
       "for. I hope I can give back even a little of the kindness you've " +
