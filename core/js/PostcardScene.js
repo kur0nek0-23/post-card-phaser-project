@@ -216,8 +216,23 @@ export class PostcardScene extends Phaser.Scene {
       wordWrap: { width: textAreaWidth },
     }).setOrigin(0.5, 0);
 
+    // A separate bold sign-off line (a page's optional `closing` field) —
+    // deliberately its own Text object rather than appended into `body`,
+    // so it reads as a distinct closing statement instead of just more
+    // flowing paragraph text, the same way `title` is already split out
+    // from `body` rather than being its first sentence.
+    const closingText = this.add.text(0, 0, '', {
+      fontFamily: 'Georgia, serif',
+      fontSize: '26px',
+      fontStyle: 'bold',
+      color: '#3a2f28',
+      align: 'center',
+      wordWrap: { width: textAreaWidth },
+    }).setOrigin(0.5, 0).setVisible(false);
+
     container.add(titleText);
     container.add(bodyText);
+    container.add(closingText);
 
     // Shared mutable state the flame flicker ticks read from (created
     // now, before buildFinaleVisuals/startFlameFlicker need it) and the
@@ -245,6 +260,7 @@ export class PostcardScene extends Phaser.Scene {
       paperImage,
       titleText,
       bodyText,
+      closingText,
       finaleImage,
       flames,
       photoImage,
@@ -387,6 +403,7 @@ export class PostcardScene extends Phaser.Scene {
     layer.titleText.setVisible(!isFinale);
     layer.bodyText.setVisible(!isFinale);
     if (layer.finaleImage) layer.finaleImage.setVisible(isFinale);
+    if (isFinale) layer.closingText.setVisible(false);
 
     // `photo` on a page is { asset, width, x, y, rotation } — see the
     // schema comment in data.js. `x`/`y` are local offsets from the
@@ -431,11 +448,33 @@ export class PostcardScene extends Phaser.Scene {
     layer.titleText.setText(page.title);
     layer.titleText.setY(textTop);
 
-    layer.bodyText.setText(page.body);
     const bodyTop = textTop + layer.titleText.height + 24;
-    layer.bodyText.setY(bodyTop);
-    const bodyMaxHeight = textBottom - bodyTop;
-    fitTextToBox(layer.bodyText, textAreaWidth, bodyMaxHeight, 26, 16);
+    const gap = 20;
+
+    // `closing` (optional) is a short bold sign-off line, laid out AFTER
+    // the body rather than folded into it — its own height is measured
+    // first (fixed font size, not shrink-to-fit, since it's meant to be
+    // short) so the body's available height can be reduced to leave room
+    // for it, then it's positioned right below wherever the body actually
+    // ended up ending.
+    if (page.closing) {
+      layer.closingText.setText(page.closing).setVisible(true);
+      const closingHeight = layer.closingText.height;
+
+      layer.bodyText.setText(page.body);
+      layer.bodyText.setY(bodyTop);
+      const bodyMaxHeight = textBottom - bodyTop - gap - closingHeight;
+      fitTextToBox(layer.bodyText, textAreaWidth, bodyMaxHeight, 26, 16);
+
+      layer.closingText.setY(bodyTop + layer.bodyText.height + gap);
+    } else {
+      layer.closingText.setVisible(false);
+
+      layer.bodyText.setText(page.body);
+      layer.bodyText.setY(bodyTop);
+      const bodyMaxHeight = textBottom - bodyTop;
+      fitTextToBox(layer.bodyText, textAreaWidth, bodyMaxHeight, 26, 16);
+    }
   }
 
   // ---- finale (cake + flickering candles) ----------------------------------

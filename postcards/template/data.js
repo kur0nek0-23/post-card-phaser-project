@@ -52,18 +52,22 @@ export const layout = {
   },
 };
 
-// Data-driven page array. Every entry is { id, type, title, body, photo? }.
+// Data-driven page array. Every entry is
+// { id, type, title, body, closing?, photo? }.
 //
 // "paper" and "finale" are the two page types PostcardScene implements:
-//   - "paper": title/body text on the paper background. Optionally add a
-//     `photo` field — { asset, width, x, y, rotation } — to overlay an
-//     image on top of the paper and its text (needs that asset added to
-//     `assets` above too); `x`/`y` are offsets from the paper's own
-//     center, `width` is the image's display width (same convention as
-//     `paper.width`), `rotation` is in degrees. See
-//     postcards/example/data.js for two worked examples (one overhanging
-//     the paper's corner, one contained within it). Not used in this
-//     starter's own seed page below.
+//   - "paper": title/body text on the paper background.
+//     - Optionally add a `closing` field — a short string — for a bold
+//       sign-off line laid out AFTER `body` as its own text block,
+//       rather than folded into the paragraph. Not used in this
+//       starter's own seed page below.
+//     - Optionally add a `photo` field — { asset, width, x, y, rotation }
+//       — to overlay an image on top of the paper and its text (needs
+//       that asset added to `assets` above too); `x`/`y` are offsets
+//       from the paper's own center, `width` is the image's display
+//       width (same convention as `paper.width`), `rotation` is in
+//       degrees. See postcards/example/data.js for a worked example.
+//       Not used in this starter's own seed page below.
 //   - "finale": renders the cake + "Happy Birthday" lettering card
 //     (finaleCard) with flickering candle flames on top; title/body are
 //     unused since the card art is fully baked. The mic-based blow-out-

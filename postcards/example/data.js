@@ -73,16 +73,23 @@ export const layout = {
   // than the envelope's was.
 };
 
-// Data-driven page array. Every entry is { id, type, title, body, photo? }.
+// Data-driven page array. Every entry is
+// { id, type, title, body, closing?, photo? }.
 //
 // "paper" and "finale" are the two page types PostcardScene implements:
-//   - "paper": title/body text on the paper background. Optionally add a
-//     `photo` field — { asset, width, x, y, rotation } — to overlay an
-//     image on top of the paper and its text (e.g. a polaroid or a full
-//     photo); see `layout` above for what those fields mean, and the last
-//     "paper" page below for a worked example (a photo kept fully inside
-//     the paper's printed area, rather than overhanging its corner).
-//     Omit `photo` for a plain text-only page.
+//   - "paper": title/body text on the paper background.
+//     - Optionally add a `closing` field — a short string — for a bold
+//       sign-off line laid out AFTER `body` as its own text block, not
+//       folded into the paragraph (e.g. "Happy Birthday, my dear
+//       friend" on the last page below). Omit it for pages that don't
+//       need one.
+//     - Optionally add a `photo` field — { asset, width, x, y, rotation }
+//       — to overlay an image on top of the paper and its text (e.g. a
+//       polaroid or a full photo); see `layout` above for what those
+//       fields mean, and the last "paper" page below for a worked
+//       example (a photo kept fully inside the paper's printed area,
+//       rather than overhanging its corner). Omit it for a plain
+//       text-only page.
 //   - "finale": renders the cake + "Happy Birthday" lettering card
 //     (finaleCard) with flickering candle flames on top; title/body are
 //     unused since the card art is fully baked. The mic-based blow-out-
@@ -153,6 +160,9 @@ export const pages = [
       "May you always smile the brightest smile.\n" +
       "May you always be happy.\n" +
       "And may you finally find the one true love you've always longed for.",
+    // A separate bold sign-off line, not part of `body` — see the `closing`
+    // schema comment above.
+    closing: "Happy Birthday, my dear friend",
     // Contained within the paper's own printed area (not overhanging its
     // edge like a polaroid would) — sits near the bottom, tilted, on top
     // of whatever text is underneath it.
