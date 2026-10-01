@@ -83,7 +83,7 @@ export class PostcardScene extends Phaser.Scene {
       targets: this.envelopeClosed,
       alpha: 1,
       scale: this.envelopeBaseScale,
-      duration: 650,
+      duration: 1000,
       ease: 'Back.easeOut',
       onComplete: () => {
         this.envelopeClosed.setInteractive();
@@ -106,14 +106,14 @@ export class PostcardScene extends Phaser.Scene {
     this.tweens.add({
       targets: this.envelopeClosed,
       alpha: 0,
-      duration: 350,
+      duration: 600,
       ease: 'Sine.easeInOut',
     });
     this.tweens.add({
       targets: this.envelopeOpen,
       alpha: 1,
       scale: baseScale,
-      duration: 350,
+      duration: 600,
       ease: 'Back.easeOut',
       onComplete: () => this.enterOpenState(),
     });
@@ -178,7 +178,7 @@ export class PostcardScene extends Phaser.Scene {
       y: restY,
       scale: 1,
       alpha: 1,
-      duration: 550,
+      duration: 1000,
       ease: 'Cubic.easeOut',
       onComplete: () => this.enterReadingState(),
     });
@@ -226,6 +226,14 @@ export class PostcardScene extends Phaser.Scene {
     const textTop = -displayHeight / 2 + insetTop;
     const textBottom = displayHeight / 2 - insetBottom;
 
+    // titleText/bodyText/closingText are never actually shown — they stay
+    // permanently invisible and exist purely as measuring tools (word-wrap,
+    // fitTextToBox's shrink-to-fit, getWrappedText()). What's actually
+    // displayed is a fresh set of individual per-character Text objects
+    // built from them on every render (see layOutTypedText), since
+    // Phaser's Text can't fade in individual characters within one object —
+    // this is what makes the "typed, with each letter fading in" reveal
+    // possible at all.
     const titleText = this.add.text(0, textTop, '', {
       fontFamily: 'Georgia, serif',
       fontSize: '34px',
@@ -233,7 +241,7 @@ export class PostcardScene extends Phaser.Scene {
       fontStyle: 'bold',
       align: 'center',
       wordWrap: { width: textAreaWidth },
-    }).setOrigin(0.5, 0);
+    }).setOrigin(0.5, 0).setVisible(false);
 
     const bodyText = this.add.text(0, 0, '', {
       fontFamily: 'Georgia, serif',
@@ -241,7 +249,7 @@ export class PostcardScene extends Phaser.Scene {
       color: '#3a2f28',
       align: 'center',
       wordWrap: { width: textAreaWidth },
-    }).setOrigin(0.5, 0);
+    }).setOrigin(0.5, 0).setVisible(false);
 
     // A separate bold sign-off line (a page's optional `closing` field) —
     // deliberately its own Text object rather than appended into `body`,
@@ -295,6 +303,7 @@ export class PostcardScene extends Phaser.Scene {
       blow,
       flameFlickerEvents,
       candlesExtinguished: false,
+      typewriter: { event: null, chars: [] },
       ...blowUI,
     };
     layerRef.current = layer;
@@ -421,21 +430,41 @@ export class PostcardScene extends Phaser.Scene {
     return photoImage;
   }
 
+  // How fast the typewriter types (ms between letters starting to fade
+  // in) and how long each individual letter's own fade-in takes. The
+  // interval is shorter than the fade duration on purpose — several
+  // letters are mid-fade at once, which reads as a continuous reveal
+  // rather than a strict "wait for this letter, then the next" crawl.
+  static TYPEWRITER_CHAR_INTERVAL_MS = 35;
+  static TYPEWRITER_CHAR_FADE_DURATION = 180;
+  // The photo overlay's own fade-in — intentionally a separate constant
+  // from the two above, since the image is explicitly NOT synced to the
+  // text's typing pace (see renderPageLayer).
+  static PHOTO_FADE_DURATION = 600;
+
   renderPageLayer(layer, index) {
     const page = this.pages[index];
     const isFinale = page.type === 'finale';
     const photo = page.photo;
 
     layer.paperImage.setVisible(!isFinale);
-    layer.titleText.setVisible(!isFinale);
-    layer.bodyText.setVisible(!isFinale);
     if (layer.finaleImage) layer.finaleImage.setVisible(isFinale);
-    if (isFinale) layer.closingText.setVisible(false);
+
+    // Typed text is rebuilt from scratch on every render (see
+    // layOutTypedText/startTypewriter below), so whatever the previous
+    // render left behind — on this same page, or this layer switching
+    // to/from the finale page, which has no text of its own — needs
+    // clearing first.
+    this.clearTypewriter(layer);
 
     // `photo` on a page is { asset, width, x, y, rotation } — see the
     // schema comment in data.js. `x`/`y` are local offsets from the
     // paper's own center, same space as everything else on the page.
+    // Fades in on its own schedule — killTweensOf guards against a
+    // previous fade still running if the page flips again before it
+    // finished — deliberately NOT tied to the text typewriter's timing.
     if (layer.photoImage) {
+      this.tweens.killTweensOf(layer.photoImage);
       if (!isFinale && photo && this.textures.exists(photo.asset)) {
         const texture = this.textures.get(photo.asset).getSourceImage();
         const scale = photo.width / texture.width;
@@ -444,7 +473,14 @@ export class PostcardScene extends Phaser.Scene {
           .setScale(scale)
           .setAngle(photo.rotation || 0)
           .setPosition(photo.x, photo.y)
+          .setAlpha(0)
           .setVisible(true);
+        this.tweens.add({
+          targets: layer.photoImage,
+          alpha: 1,
+          duration: PostcardScene.PHOTO_FADE_DURATION,
+          ease: 'Sine.easeOut',
+        });
       } else {
         layer.photoImage.setVisible(false);
       }
@@ -471,12 +507,18 @@ export class PostcardScene extends Phaser.Scene {
     if (isFinale) return; // finale card is fully baked art — no text to lay out
 
     const { textAreaWidth, textTop, textBottom } = layer.textLayout;
+    const gap = 20;
+    // Typed in this order — title, then body, then (if present) the
+    // closing line — as ONE continuous sequence on a single timer, not
+    // three separate typewriters, so body picks up typing immediately
+    // where title left off.
+    const allChars = [];
 
     layer.titleText.setText(page.title);
     layer.titleText.setY(textTop);
+    allChars.push(...this.layOutTypedText(layer, layer.titleText, textTop));
 
     const bodyTop = textTop + layer.titleText.height + 24;
-    const gap = 20;
 
     // `closing` (optional) is a short bold sign-off line, laid out AFTER
     // the body rather than folded into it — its own height is measured
@@ -485,23 +527,115 @@ export class PostcardScene extends Phaser.Scene {
     // for it, then it's positioned right below wherever the body actually
     // ended up ending.
     if (page.closing) {
-      layer.closingText.setText(page.closing).setVisible(true);
+      layer.closingText.setText(page.closing);
       const closingHeight = layer.closingText.height;
 
       layer.bodyText.setText(page.body);
       layer.bodyText.setY(bodyTop);
       const bodyMaxHeight = textBottom - bodyTop - gap - closingHeight;
       fitTextToBox(layer.bodyText, textAreaWidth, bodyMaxHeight, 26, 16);
+      allChars.push(...this.layOutTypedText(layer, layer.bodyText, bodyTop));
 
-      layer.closingText.setY(bodyTop + layer.bodyText.height + gap);
+      const closingTop = bodyTop + layer.bodyText.height + gap;
+      layer.closingText.setY(closingTop);
+      allChars.push(...this.layOutTypedText(layer, layer.closingText, closingTop));
     } else {
-      layer.closingText.setVisible(false);
-
       layer.bodyText.setText(page.body);
       layer.bodyText.setY(bodyTop);
       const bodyMaxHeight = textBottom - bodyTop;
       fitTextToBox(layer.bodyText, textAreaWidth, bodyMaxHeight, 26, 16);
+      allChars.push(...this.layOutTypedText(layer, layer.bodyText, bodyTop));
     }
+
+    this.startTypewriter(layer, allChars);
+  }
+
+  // ---- typewriter text reveal -----------------------------------------
+
+  // Destroys this layer's current set of per-character objects and stops
+  // its reveal timer, if any — called at the start of every render so a
+  // fresh page (or the finale page, which has none of its own) never
+  // shows leftover characters from whatever this layer displayed before.
+  clearTypewriter(layer) {
+    if (layer.typewriter.event) {
+      layer.typewriter.event.remove();
+      layer.typewriter.event = null;
+    }
+    layer.typewriter.chars.forEach((c) => c.destroy());
+    layer.typewriter.chars = [];
+  }
+
+  // Builds one already-wrapped text block (title/body/closing) as
+  // individual, initially-invisible character Text objects matching
+  // `sourceText`'s current style (font/size/weight/color) — rather than
+  // ever making `sourceText` itself visible, since Phaser's Text can't
+  // fade in individual characters within a single object. `sourceText`
+  // stays in the scene purely as a measuring tool: its existing
+  // wordWrap/fitTextToBox sizing (set by the caller before this runs) is
+  // untouched, this just reads the result back via getWrappedText().
+  //
+  // Each line is centered the same way the original `align: 'center'`
+  // would, using every character's own measured width — real Text
+  // objects, so Phaser computes this synchronously right on creation.
+  // Inserted into the container just before the photo overlay (which was
+  // originally added last, specifically to stay on top of the text), so
+  // photos still draw on top of these even though they're created well
+  // after buildPageLayer's initial child order.
+  layOutTypedText(layer, sourceText, startY) {
+    if (!sourceText.text) return [];
+    const lines = sourceText.getWrappedText();
+    const lineHeight = sourceText.height / lines.length;
+    const style = {
+      fontFamily: sourceText.style.fontFamily,
+      fontSize: sourceText.style.fontSize,
+      fontStyle: sourceText.style.fontStyle,
+      color: sourceText.style.color,
+    };
+
+    const chars = [];
+    lines.forEach((line, lineIndex) => {
+      const lineChars = [...line].map((ch) => {
+        const charObj = this.add.text(0, 0, ch, style).setOrigin(0, 0).setAlpha(0);
+        const photoIndex = layer.container.list.indexOf(layer.photoImage);
+        layer.container.addAt(charObj, photoIndex);
+        return charObj;
+      });
+      const lineWidth = lineChars.reduce((sum, c) => sum + c.width, 0);
+      const lineY = startY + lineIndex * lineHeight;
+      let cursorX = -lineWidth / 2;
+      lineChars.forEach((c) => {
+        c.setPosition(cursorX, lineY);
+        cursorX += c.width;
+      });
+      chars.push(...lineChars);
+    });
+
+    layer.typewriter.chars.push(...chars);
+    return chars;
+  }
+
+  // Reveals `chars` in order, one at a time, on a fixed low-frequency
+  // timer — each character hard-starts invisible and fades in on its own
+  // short tween rather than popping to full opacity instantly, which is
+  // what makes this read as "typed, with each letter fading in" instead
+  // of a classic hard-cut typewriter.
+  startTypewriter(layer, chars) {
+    if (chars.length === 0) return;
+    let index = 0;
+    layer.typewriter.event = this.time.addEvent({
+      delay: PostcardScene.TYPEWRITER_CHAR_INTERVAL_MS,
+      repeat: chars.length - 1,
+      callback: () => {
+        const charObj = chars[index];
+        index += 1;
+        this.tweens.add({
+          targets: charObj,
+          alpha: 1,
+          duration: PostcardScene.TYPEWRITER_CHAR_FADE_DURATION,
+          ease: 'Sine.easeOut',
+        });
+      },
+    });
   }
 
   // ---- finale (cake + flickering candles) ----------------------------------
@@ -828,7 +962,7 @@ export class PostcardScene extends Phaser.Scene {
   }
 
   // Shared duration (ms) for both halves of the page crossfade below.
-  static PAGE_CROSSFADE_DURATION = 250;
+  static PAGE_CROSSFADE_DURATION = 400
 
   goToPage(delta) {
     if (this.state !== 'reading' || this.isTransitioning) return;
@@ -935,14 +1069,4 @@ export class PostcardScene extends Phaser.Scene {
     container.on('pointerdown', onClick);
     return container;
   }
-
-  // ---------------------------------------------------------------------
-  // The finale page (cake card + flickering candle flames,
-  // buildFinaleVisuals()) and the mic-based "blow out the candles"
-  // interaction (buildBlowInteraction() + handleBlowButtonTap()
-  // onward) are both implemented. Not implemented: sound effects for
-  // any of this (see core/js/audio.js — still a no-op stub), and the
-  // "paper-photo" page type's photo slot stays a plain empty polaroid
-  // frame (no actual photo compositing).
-  // ---------------------------------------------------------------------
 }

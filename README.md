@@ -80,6 +80,19 @@ can actually start, so `bgMusic`'s autoplay attempt may be silently
 queued by Phaser until the very next tap unlocks audio, rather than
 playing the instant the envelope appears, on some browsers.
 
+## Text reveal + photo fade-in
+
+Each "paper" page's title/body (and `closing`, if present) types itself
+on letter by letter, in reading order, with each character fading in
+individually rather than popping to full opacity — `renderPageLayer()`
+builds a fresh set of per-character Text objects from the (invisible,
+measurement-only) title/body/closing Text objects via
+`layOutTypedText()`, then reveals them on a timer via `startTypewriter()`
+(`PostcardScene.TYPEWRITER_CHAR_INTERVAL_MS`/`TYPEWRITER_CHAR_FADE_DURATION`
+tune the pace). A page's photo overlay fades in on its own separate timer
+(`PostcardScene.PHOTO_FADE_DURATION`) — deliberately not synced to the
+text's typing pace.
+
 ## Stubs — not implemented yet
 
 - **A photo actually inside the polaroid frame's die-cut window.** Any
