@@ -435,12 +435,12 @@ export class PostcardScene extends Phaser.Scene {
   // interval is shorter than the fade duration on purpose — several
   // letters are mid-fade at once, which reads as a continuous reveal
   // rather than a strict "wait for this letter, then the next" crawl.
-  static TYPEWRITER_CHAR_INTERVAL_MS = 35;
+  static TYPEWRITER_CHAR_INTERVAL_MS = 60
   static TYPEWRITER_CHAR_FADE_DURATION = 180;
   // The photo overlay's own fade-in — intentionally a separate constant
   // from the two above, since the image is explicitly NOT synced to the
   // text's typing pace (see renderPageLayer).
-  static PHOTO_FADE_DURATION = 600;
+  static PHOTO_FADE_DURATION = 2000;
 
   renderPageLayer(layer, index) {
     const page = this.pages[index];
@@ -971,7 +971,8 @@ export class PostcardScene extends Phaser.Scene {
 
     this.isTransitioning = true;
     this.currentIndex = next;
-    audio.play('paperFlip');
+    audio.play('paperFlip', { volume: 0.2 });
+
 
     const outgoing = this.pageLayers[this.activeLayerIndex];
     const incomingIndex = 1 - this.activeLayerIndex;
