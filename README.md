@@ -40,7 +40,7 @@ No file under `/core/` needs to change for a new postcard site.
   - `js/audio.js` — thin wrapper around Phaser's Sound Manager; plays
     whatever a site loaded via its `sounds` manifest (see below).
 - `/postcards/template/` — starter scaffold.
-- `/postcards/example/` — a working postcard built from the template, using
+- `/postcards/for-wlh/` — a working postcard built from the template, using
   real art and a seeded 4-page birthday message (3 letter pages + finale).
 
 ## Blow-out-the-candles interaction
@@ -71,7 +71,7 @@ in `index.html` alongside `assets`/`layout`/`pages`. `core/js/audio.js`'s
 with no `sounds` manifest at all (like `postcards/template`) works
 exactly as before.
 
-`postcards/example` wires up four clips PostcardScene already calls by
+`postcards/for-wlh` wires up four clips PostcardScene already calls by
 name: `bgMusic` (starts once the closed envelope's zoom/fade-in intro
 finishes), `envelopeOpen` (tapping the closed envelope),
 `paperFlip` (every page turn, either direction), and `candleBlow`
@@ -99,7 +99,7 @@ text's typing pace.
   page can overlay a photo now (see the `photo` field in the pages-array
   schema comment in data.js, and `buildPhotoOverlay()` in
   PostcardScene.js) — the "One more thing..." example page in
-  postcards/example uses this for a full photo. What's still missing is
+  postcards/for-wlh uses this for a full photo. What's still missing is
   compositing a *second* image specifically into the polaroid frame's
   blank window (as used on the "PS" page) — today that window just stays
   empty/blank, since the frame is the only image there.

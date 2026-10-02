@@ -17,7 +17,7 @@ export const assets = {
 // Sound manifest: logical key -> path relative to this file's folder.
 // BootScene loads exactly these keys (via this.load.audio), same
 // optional/omit-if-falsy convention as `assets` above. Empty here since
-// this starter has no audio of its own — see postcards/example/data.js
+// this starter has no audio of its own — see postcards/for-wlh/data.js
 // for a working example (background music plus a few sound effects:
 // PostcardScene plays `bgMusic`, `envelopeOpen`, `paperFlip`, and
 // `candleBlow` by those exact key names at the relevant moments, so
@@ -76,7 +76,7 @@ export const layout = {
 //       that asset added to `assets` above too); `x`/`y` are offsets
 //       from the paper's own center, `width` is the image's display
 //       width (same convention as `paper.width`), `rotation` is in
-//       degrees. See postcards/example/data.js for a worked example.
+//       degrees. See postcards/for-wlh/data.js for a worked example.
 //       Not used in this starter's own seed page below.
 //   - "finale": renders the cake + "Happy Birthday" lettering card
 //     (finaleCard) with flickering candle flames on top; title/body are
