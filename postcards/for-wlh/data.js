@@ -132,10 +132,10 @@ export const pages = [
     type: 'paper',
     title: '',
     body:
-      "For seven long years, you've been one true friend to me." +
-      "onestly, you have no idea how much I've leaned on you emotionally, haha. " +
-      "I've told you more than I could ever share with anyone else."+
-      "Thank you for always being such a good listener, even when I rambled on and on.",
+      "For seven long years, you've been one true friend to me. " +
+      "Honestly, you have no idea how much I've leaned on you emotionally, haha. " +
+      "I've told you more than I could ever share with anyone else. "+
+      "Thank you for always being such a good listener, even when I rambled on and on. ",
 
       
     photo: { asset: 'image2', width: 400, x: 6, y: 200, rotation: 4 },
