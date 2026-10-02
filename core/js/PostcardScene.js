@@ -83,7 +83,7 @@ export class PostcardScene extends Phaser.Scene {
       targets: this.envelopeClosed,
       alpha: 1,
       scale: this.envelopeBaseScale,
-      duration: 1000,
+      duration: 2500,
       ease: 'Back.easeOut',
       onComplete: () => {
         this.envelopeClosed.setInteractive();
